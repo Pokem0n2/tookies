@@ -24,10 +24,24 @@ APK_DIR="$WS/apk"
 BUILD_DIR="$APK_DIR/build"
 VERSION_TAG=$(cd "$WS" && git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 VERSION="${VERSION_TAG#v}"
+# versionCode: convert semver "0.2.1" → integer 20001 (major*10000 + minor*100 + patch)
+VC_MAJOR=$(echo "$VERSION" | cut -d. -f1)
+VC_MINOR=$(echo "$VERSION" | cut -d. -f2)
+VC_PATCH=$(echo "$VERSION" | cut -d. -f3)
+VC_PATCH="${VC_PATCH:-0}"
+VC_MINOR="${VC_MINOR:-0}"
+VC_MAJOR="${VC_MAJOR:-0}"
+VERSION_CODE=$(( VC_MAJOR * 10000 + VC_MINOR * 100 + VC_PATCH ))
 APK_NAME="tookies-v${VERSION}"
-echo "Building: $APK_NAME.apk (from tag $VERSION_TAG)"
+echo "Building: $APK_NAME.apk (versionCode=$VERSION_CODE, versionName=$VERSION)"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/obj" "$BUILD_DIR/dex" "$BUILD_DIR/compiled"
+# Inject version into AndroidManifest.xml (aapt2 --version-name is unreliable under box64)
+MANIFEST_TMP="$BUILD_DIR/AndroidManifest.xml"
+sed -e "s/android:versionCode=\"[^\"]*\"/android:versionCode=\"$VERSION_CODE\"/" \
+    -e "s/android:versionName=\"[^\"]*\"/android:versionName=\"$VERSION\"/" \
+    "$APK_DIR/AndroidManifest.xml" > "$MANIFEST_TMP"
+echo "Manifest version: code=$VERSION_CODE name=$VERSION"
 echo "=== 1. Compile Java ==="
 javac -source 8 -target 8 -bootclasspath "$ANDROID_JAR" \
   -d "$BUILD_DIR/obj" \
@@ -43,11 +57,10 @@ $X compile -o "$BUILD_DIR/compiled/" --dir "$APK_DIR/res"
 echo "=== 4. aapt2 link ==="
 $X link -o "$BUILD_DIR/${APK_NAME}.unsigned.apk" \
   -I "$ANDROID_JAR" \
-  --manifest "$APK_DIR/AndroidManifest.xml" \
-  --version-code 1 --version-name "$VERSION" \
+  --manifest "$MANIFEST_TMP" \
   --auto-add-overlay \
   -A "$APK_DIR/assets" \
-  "$BUILD_DIR/compiled/"/*.flat
+  "$BUILD_DIR/compiled/"*.flat
 echo "=== 5. Add DEX to APK ==="
 cp "$BUILD_DIR/dex/classes.dex" "$BUILD_DIR/classes.dex"
 (cd "$BUILD_DIR" && $A add "${APK_NAME}.unsigned.apk" "classes.dex")
