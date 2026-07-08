@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Simple "T" mark inside 72dp safe zone (18..90) -->
+    <path android:fillColor="#FFD369" android:pathData="M34,30 L74,30 L74,40 L60,40 L60,78 L48,78 L48,40 L34,40 Z"/>
+</vector>
