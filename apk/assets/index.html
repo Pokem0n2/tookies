@@ -17,7 +17,6 @@ html,body{margin:0;padding:0;height:100%;width:100%;background:#fff;color:#222;f
 .topbar .title{font-size:16px;font-weight:600;margin-left:2px}
 .view{flex:1;display:none;position:relative;overflow:hidden}
 .view.active{display:flex;flex-direction:column}
-/* Home */
 #view-home{background:#fafafa;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .home-header{padding:24px 16px 8px;font-size:22px;font-weight:700}
 .home-sub{padding:0 16px 16px;font-size:13px;color:#888}
@@ -26,7 +25,6 @@ html,body{margin:0;padding:0;height:100%;width:100%;background:#fff;color:#222;f
 .tile:active{transform:scale(.96);background:#f7f7f7}
 .tile-icon svg{width:34px;height:34px;stroke:#222;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .tile-label{font-size:12px;color:#444;font-weight:500}
-/* Paint toolbar — single row */
 .paint-toolbar{height:50px;display:flex;align-items:center;padding:0 6px;gap:5px;background:#fff;border-top:1px solid #eee;flex-shrink:0}
 .color-btn{width:34px;height:34px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px #ccc;cursor:pointer;flex-shrink:0;padding:0;outline:none;transition:box-shadow .15s}
 .color-btn:active{box-shadow:0 0 0 1.5px #222}
@@ -43,7 +41,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .icon-btn.danger{background:#fee}
 .icon-btn.danger:active{background:#fcc}
 canvas{flex:1;display:block;background:#fff;touch-action:none}
-/* Color wheel overlay */
 .color-overlay{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;z-index:100;align-items:center;justify-content:center}
 .color-overlay.show{display:flex}
 .color-wheel{position:relative;width:180px;height:180px;animation:cw .15s ease-out}
@@ -51,7 +48,6 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 .color-dot{position:absolute;width:38px;height:38px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;transform:translate(-50%,-50%);transition:transform .1s}
 .color-dot:active{transform:translate(-50%,-50%) scale(1.2)}
 .color-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.8);box-shadow:0 1px 4px rgba(0,0,0,.2)}
-/* Ruler — vertical strips on left/right (long edges in portrait) */
 #view-ruler{background:#fff}
 .ruler-frame{flex:1;display:flex;flex-direction:row;position:relative}
 .ruler-strip{width:36px;flex-shrink:0;background:#fff;overflow:hidden}
@@ -100,123 +96,197 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 </div>
 <script>
 (function(){
-'use strict';
 var TOOLS=[
-{id:'paint',label:'简易画板',icon:'<svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="6" cy="6" r="1.5" fill="#222" stroke="none"/></svg>'},
-{id:'ruler',label:'屏幕尺',icon:'<svg viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="5" rx="1"/><line x1="7" y1="2" x2="7" y2="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="17" y1="2" x2="17" y2="5"/><line x1="3" y1="7" x2="3" y2="22"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="6" y1="15" x2="6" y2="19"/><line x1="6" y1="22" x2="6" y2="22"/></svg>'}
+{id:"paint",label:"简易画板",icon:'<svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="6" cy="6" r="1.5" fill="#222" stroke="none"/></svg>'},
+{id:"ruler",label:"屏幕尺",icon:'<svg viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="5" rx="1"/><line x1="7" y1="2" x2="7" y2="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="17" y1="2" x2="17" y2="5"/><line x1="3" y1="7" x2="3" y2="22"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="6" y1="15" x2="6" y2="19"/></svg>'}
 ];
-var grid=document.getElementById('grid');
-TOOLS.forEach(function(t){var el=document.createElement('div');el.className='tile';el.innerHTML='<div class="tile-icon">'+t.icon+'</div><div class="tile-label">'+t.label+'</div>';el.addEventListener('click',function(){location.hash='#'+t.id;});grid.appendChild(el);});
-var topbar=document.getElementById('topbar'),topTitle=document.getElementById('topTitle'),backBtn=document.getElementById('backBtn');
-function show(v,t){[].forEach.call(document.querySelectorAll('.view'),function(e){e.classList.remove('active');});document.getElementById(v).classList.add('active');if(v==='view-home'){topbar.classList.add('hidden');}else{topbar.classList.remove('hidden');topTitle.textContent=t||'';}var tool=v==='view-home'?null:v.replace('view-','');if(tool==='paint')setTimeout(paintResize,0);if(tool==='ruler')setTimeout(rulerInit,0);location.hash=v==='view-home'?'':'#'+tool;}
-backBtn.addEventListener('click',function(){show('view-home');});
-function route(){var h=location.hash.replace('#','');if(h==='paint')show('view-paint','简易画板');else if(h==='ruler')show('view-ruler','屏幕尺');else show('view-home');}
-window.addEventListener('hashchange',route);
-/* ── Paint ── */
-var cv,ctx,sizeEl,sizeVal,eraserBtn,colorBtn,colorOverlay,colorWheel;
-var strokes=[],redoStack=[],current=null,drawing=false;
-var currentColor='#000000',currentSize=2,isEraser=false;
-var COLORS=['#000000','#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa','#ffffff'];
-function updateColorBtn(){colorBtn.style.background=currentColor;}
-function paintResize(){cv=document.getElementById('cv');if(!cv)return;var r=cv.getBoundingClientRect();if(cv.width!==Math.floor(r.width)||cv.height!==Math.floor(r.height)){cv.width=Math.floor(r.width);cv.height=Math.floor(r.height);redrawAll();}}
-function drawStroke(s){if(!s.points.length)return;ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(s.points[0].x,s.points[0].y);for(var i=1;i<s.points.length;i++)ctx.lineTo(s.points[i].x,s.points[i].y);if(s.points.length===1){ctx.arc(s.points[0].x,s.points[0].y,s.size/2,0,Math.PI*2);ctx.fillStyle=s.color;ctx.fill();}else{ctx.stroke();}}
-function redrawAll(){ctx.clearRect(0,0,cv.width,cv.height);for(var i=0;i<strokes.length;i++)drawStroke(strokes[i]);}
-function getPos(e){var r=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
-function paintStart(e){e.preventDefault();drawing=true;redoStack.length=0;var p=getPos(e);current={color:isEraser?'#ffffff':currentColor,size:currentSize,points:[p]};strokes.push(current);drawStroke(current);}
-function paintMove(e){if(!drawing)return;e.preventDefault();var p=getPos(e);var last=current.points[current.points.length-1];if(Math.abs(p.x-last.x)<1.5&&Math.abs(p.y-last.y)<1.5)return;current.points.push(p);ctx.strokeStyle=current.color;ctx.lineWidth=current.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();}
-function paintEnd(e){if(!drawing)return;e&&e.preventDefault();drawing=false;if(current&&t.points.length===0)strokes.pop();current=null;}
-function setColor(c){currentColor=c;isEraser=false;eraserBtn.classList.remove('on');updateColorBtn();}
-function setEraser(){isEraser=true;eraserBtn.classList.add('on');colorBtn.style.background='#fff';}
-/* color wheel */
-function buildWheel(){
-colorWheel.innerHTML='';
-var cx=90,cy=90,R=62;
-COLORS.forEach(function(c,i){
-var a=(i/COLORS.length)*Math.PI*2-Math.PI/2;
-var dot=document.createElement('div');
-dot.className='color-dot';dot.style.background=c;
-dot.style.left=(cx+R*Math.cos(a))+'px';dot.style.top=(cy+R*Math.sin(a))+'px';
-dot.addEventListener('click',function(e){e.stopPropagation();setColor(c);closeWheel();});
-colorWheel.appendChild(dot);
+var grid=document.getElementById("grid");
+TOOLS.forEach(function(t){
+  var el=document.createElement("div");
+  el.className="tile";
+  el.innerHTML='<div class="tile-icon">'+t.icon+'</div><div class="tile-label">'+t.label+'</div>';
+  el.addEventListener("click",function(){location.hash="#"+t.id;});
+  grid.appendChild(el);
 });
-var ind=document.createElement('div');ind.className='color-center';ind.id='wheelCenter';
-colorWheel.appendChild(ind);
+var topbar=document.getElementById("topbar"),topTitle=document.getElementById("topTitle"),backBtn=document.getElementById("backBtn");
+function show(v,t){
+  var views=document.querySelectorAll(".view");
+  for(var i=0;i<views.length;i++)views[i].classList.remove("active");
+  document.getElementById(v).classList.add("active");
+  if(v==="view-home"){topbar.classList.add("hidden");}
+  else{topbar.classList.remove("hidden");topTitle.textContent=t||"";}
+  var tool=v==="view-home"?null:v.replace("view-","");
+  if(tool==="paint")setTimeout(paintResize,0);
+  if(tool==="ruler")setTimeout(rulerInit,0);
+  location.hash=v==="view-home"?"":"#"+tool;
 }
-function updateWheelCenter(){var c=document.getElementById('wheelCenter');if(c)c.style.background=currentColor;}
-function openWheel(){updateWheelCenter();colorOverlay.classList.add('show');}
-function closeWheel(){colorOverlay.classList.remove('show');}
+backBtn.addEventListener("click",function(){show("view-home");});
+function route(){
+  var h=location.hash.replace("#","");
+  if(h==="paint")show("view-paint","简易画板");
+  else if(h==="ruler")show("view-ruler","屏幕尺");
+  else show("view-home");
+}
+window.addEventListener("hashchange",route);
+var cv,ctx,sizeEl,sizeVal,eraserBtn,colorBtn,colorOverlay,colorWheel,undoBtn,redoBtn,clearBtn;
+var strokes=[],redoStack=[],current=null,drawing=false;
+var currentColor="#000000",currentSize=2,isEraser=false;
+var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#ffffff"];
+function updateColorBtn(){colorBtn.style.background=currentColor;}
+function paintResize(){
+  cv=document.getElementById("cv");
+  if(!cv)return;
+  var r=cv.getBoundingClientRect();
+  if(cv.width!==Math.floor(r.width)||cv.height!==Math.floor(r.height)){
+    cv.width=Math.floor(r.width);cv.height=Math.floor(r.height);redrawAll();
+  }
+}
+function drawStroke(s){
+  if(!s.points.length)return;
+  ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.lineCap="round";ctx.lineJoin="round";
+  ctx.beginPath();ctx.moveTo(s.points[0].x,s.points[0].y);
+  for(var i=1;i<s.points.length;i++)ctx.lineTo(s.points[i].x,s.points[i].y);
+  if(s.points.length===1){
+    ctx.arc(s.points[0].x,s.points[0].y,s.size/2,0,Math.PI*2);
+    ctx.fillStyle=s.color;ctx.fill();
+  }else{ctx.stroke();}
+}
+function redrawAll(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  for(var i=0;i<strokes.length;i++)drawStroke(strokes[i]);
+}
+function getPos(e){
+  var r=cv.getBoundingClientRect();
+  var t=e.touches?e.touches[0]:e;
+  return{x:t.clientX-r.left,y:t.clientY-r.top};
+}
+function paintStart(e){
+  e.preventDefault();
+  drawing=true;redoStack.length=0;
+  var p=getPos(e);
+  current={color:isEraser?"#ffffff":currentColor,size:currentSize,points:[p]};
+  strokes.push(current);drawStroke(current);
+}
+function paintMove(e){
+  if(!drawing)return;
+  e.preventDefault();
+  var p=getPos(e);
+  var last=current.points[current.points.length-1];
+  if(Math.abs(p.x-last.x)<1.5 && Math.abs(p.y-last.y)<1.5)return;
+  current.points.push(p);
+  ctx.strokeStyle=current.color;ctx.lineWidth=current.size;ctx.lineCap="round";ctx.lineJoin="round";
+  ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();
+}
+function paintEnd(e){
+  if(!drawing)return;
+  if(e)e.preventDefault();
+  drawing=false;
+  if(current && current.points.length===0)strokes.pop();
+  current=null;
+}
+function setColor(c){
+  currentColor=c;isEraser=false;
+  eraserBtn.classList.remove("on");
+  updateColorBtn();
+}
+function setEraser(){
+  isEraser=true;eraserBtn.classList.add("on");
+  colorBtn.style.background="#fff";
+}
+function buildWheel(){
+  colorWheel.innerHTML="";
+  var cx=90,cy=90,R=62;
+  COLORS.forEach(function(c,i){
+    var a=(i/COLORS.length)*Math.PI*2-Math.PI/2;
+    var dot=document.createElement("div");
+    dot.className="color-dot";
+    dot.style.background=c;
+    dot.style.left=(cx+R*Math.cos(a))+"px";
+    dot.style.top=(cy+R*Math.sin(a))+"px";
+    dot.addEventListener("click",function(e){e.stopPropagation();setColor(c);closeWheel();});
+    colorWheel.appendChild(dot);
+  });
+  var ind=document.createElement("div");
+  ind.className="color-center";
+  ind.id="wheelCenter";
+  colorWheel.appendChild(ind);
+}
+function updateWheelCenter(){
+  var c=document.getElementById("wheelCenter");
+  if(c)c.style.background=currentColor;
+}
+function openWheel(){updateWheelCenter();colorOverlay.classList.add("show");}
+function closeWheel(){colorOverlay.classList.remove("show");}
 function paintInit(){
-cv=document.getElementById('cv');ctx=cv.getContext('2d');
-sizeEl=document.getElementById('size');sizeVal=document.getElementById('sizeVal');
-eraserBtn=document.getElementById('eraserBtn');colorBtn=document.getElementById('colorBtn');
-colorOverlay=document.getElementById('colorOverlay');colorWheel=document.getElementById('colorWheel');
-undoBtn=document.getElementById('undoBtn');redoBtn=document.getElementById('redoBtn');clearBtn=document.getElementById('clearBtn');
-updateColorBtn();buildWheel();
-colorBtn.addEventListener('click',openWheel);
-colorOverlay.addEventListener('click',closeWheel);
-colorWheel.addEventListener('click',function(e){e.stopPropagation();});
-sizeEl.addEventListener('input',function(){currentSize=parseInt(sizeEl.value,10);sizeVal.textContent=currentSize;});
-eraserBtn.addEventListener('click',setEraser);
-undoBtn.addEventListener('click',function(){if(strokes.length){redoStack.push(strokes.pop());redrawAll();}});
-redoBtn.addEventListener('click',function(){if(redoStack.length){strokes.push(redoStack.pop());redrawAll();}});
-clearBtn.addEventListener('click',function(){if(!strokes.length)return;if(confirm('确定清空画板？')){strokes.length=0;redoStack.length=0;redrawAll();}});
-cv.addEventListener('touchstart',paintStart,{passive:false});cv.addEventListener('mousedown',paintStart);
-cv.addEventListener('touchmove',paintMove,{passive:false});cv.addEventListener('mousemove',paintMove);
-cv.addEventListener('touchend',paintEnd);cv.addEventListener('mouseup',paintEnd);cv.addEventListener('mouseleave',paintEnd);
-window.addEventListener('resize',paintResize);paintResize();
+  cv=document.getElementById("cv");ctx=cv.getContext("2d");
+  sizeEl=document.getElementById("size");sizeVal=document.getElementById("sizeVal");
+  eraserBtn=document.getElementById("eraserBtn");colorBtn=document.getElementById("colorBtn");
+  colorOverlay=document.getElementById("colorOverlay");colorWheel=document.getElementById("colorWheel");
+  undoBtn=document.getElementById("undoBtn");redoBtn=document.getElementById("redoBtn");clearBtn=document.getElementById("clearBtn");
+  updateColorBtn();buildWheel();
+  colorBtn.addEventListener("click",openWheel);
+  colorOverlay.addEventListener("click",closeWheel);
+  colorWheel.addEventListener("click",function(e){e.stopPropagation();});
+  sizeEl.addEventListener("input",function(){currentSize=parseInt(sizeEl.value,10);sizeVal.textContent=currentSize;});
+  eraserBtn.addEventListener("click",setEraser);
+  undoBtn.addEventListener("click",function(){if(strokes.length){redoStack.push(strokes.pop());redrawAll();}});
+  redoBtn.addEventListener("click",function(){if(redoStack.length){strokes.push(redoStack.pop());redrawAll();}});
+  clearBtn.addEventListener("click",function(){if(!strokes.length)return;if(confirm("确定清空画板？")){strokes.length=0;redoStack.length=0;redrawAll();}});
+  cv.addEventListener("touchstart",paintStart,{passive:false});
+  cv.addEventListener("mousedown",paintStart);
+  cv.addEventListener("touchmove",paintMove,{passive:false});
+  cv.addEventListener("mousemove",paintMove);
+  cv.addEventListener("touchend",paintEnd);
+  cv.addEventListener("mouseup",paintEnd);
+  cv.addEventListener("mouseleave",paintEnd);
+  window.addEventListener("resize",paintResize);
+  paintResize();
 }
-/* ── Ruler ── */
-/* On Android: 1 CSS px = 1 dp = 1/160 inch. So pxPerMm = 160/25.4 */
-var PX_PER_MM=160/25.4; /* ≈6.299 */
+var PX_PER_MM=160/25.4;
 function buildVRuler(svg,flip){
-var frame=document.getElementById('rulerFrame');
-var H=frame.clientHeight; /* CSS px height available */
-var W=36; /* strip width */
-svg.setAttribute('viewBox','0 0 '+W+' '+H);
-svg.setAttribute('preserveAspectRatio','none');
-var parts=[];
-/* baseline: left ruler baseline at x=0, right ruler at x=W */
-var baseX=flip?W:0;
-/* tick direction: left → rightward(+), right → leftward(-) */
-var dir=flip?-1:1;
-parts.push('<line x1="'+baseX+'" y1="0" x2="'+baseX+'" y2="'+H+'" stroke="#999" stroke-width="0.5"/>');
-var totalMm=Math.ceil(H/PX_PER_MM)+1;
-for(var mm=0;mm<=totalMm;mm++){
-var y=mm*PX_PER_MM;
-if(y>H+1)break;
-var major=(mm%10===0),minor=(mm%5===0);
-var len=major?22:(minor?14:8);
-var col=major?'#333':(minor?'#888':'#bbb');
-var sw=major?0.8:(minor?0.5:0.3);
-var x2=baseX+dir*len;
-parts.push('<line x1="'+baseX+'" y1="'+y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="'+sw+'"/>');
-if(major){
-var cm=mm/10;
-/* number position: inside the strip, away from baseline */
-var tx=flip?(W-len-3):(len+3);
-var anchor=flip?'end':'start';
-/* dominant-baseline central to vertically center on tick */
-parts.push('<text x="'+tx+'" y="'+y.toFixed(1)+'" font-size="7" fill="#555" text-anchor="'+anchor+'" dominant-baseline="central" font-family="sans-serif">'+cm+'</text>');
-}
-}
-svg.innerHTML=parts.join('');
+  var frame=document.getElementById("rulerFrame");
+  var H=frame.clientHeight;
+  var W=36;
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  svg.setAttribute("preserveAspectRatio","none");
+  var parts=[];
+  var baseX=flip?W:0;
+  var dir=flip?-1:1;
+  parts.push("<line x1=\""+baseX+"\" y1=\"0\" x2=\""+baseX+"\" y2=\""+H+"\" stroke=\"#999\" stroke-width=\"0.5\"/>");
+  var totalMm=Math.ceil(H/PX_PER_MM)+1;
+  for(var mm=0;mm<=totalMm;mm++){
+    var y=mm*PX_PER_MM;
+    if(y>H+1)break;
+    var major=(mm%10===0),minor=(mm%5===0);
+    var len=major?22:(minor?14:8);
+    var col=major?"#333":(minor?"#888":"#bbb");
+    var sw=major?0.8:(minor?0.5:0.3);
+    var x2=baseX+dir*len;
+    parts.push("<line x1=\""+baseX+"\" y1=\""+y.toFixed(1)+"\" x2=\""+x2.toFixed(1)+"\" y2=\""+y.toFixed(1)+"\" stroke=\""+col+"\" stroke-width=\""+sw+"\"/>");
+    if(major){
+      var cm=mm/10;
+      var tx=flip?(W-len-3):(len+3);
+      var anchor=flip?"end":"start";
+      parts.push("<text x=\""+tx+"\" y=\""+y.toFixed(1)+"\" font-size=\"7\" fill=\"#555\" text-anchor=\""+anchor+"\" dominant-baseline=\"central\" font-family=\"sans-serif\">"+cm+"</text>");
+    }
+  }
+  svg.innerHTML=parts.join("");
 }
 function rulerInit(){
-var dpr=window.devicePixelRatio||1;
-var sw=window.screen.width,sh=window.screen.height;
-var dpi=dpr*160;
-var wIn=sw*dpr/dpi,hIn=sh*dpr/dpi; /* = sw/160, sh/160 */
-var diag=Math.sqrt(wIn*wIn+hIn*hIn);
-document.getElementById('devW').textContent=(sw/160*2.54).toFixed(1)+' cm';
-document.getElementById('devH').textContent=(sh/160*2.54).toFixed(1)+' cm';
-document.getElementById('diag').textContent=diag.toFixed(2)+'″ ('+(diag*2.54).toFixed(1)+' cm)';
-buildVRuler(document.getElementById('rulerLeftSvg'),false);
-buildVRuler(document.getElementById('rulerRightSvg'),true);
+  var dpr=window.devicePixelRatio||1;
+  var sw=window.screen.width,sh=window.screen.height;
+  var dpi=dpr*160;
+  var wIn=sw*dpr/dpi,hIn=sh*dpr/dpi;
+  var diag=Math.sqrt(wIn*wIn+hIn*hIn);
+  document.getElementById("devW").textContent=(sw/160*2.54).toFixed(1)+" cm";
+  document.getElementById("devH").textContent=(sh/160*2.54).toFixed(1)+" cm";
+  document.getElementById("diag").textContent=diag.toFixed(2)+"″ ("+(diag*2.54).toFixed(1)+" cm)";
+  buildVRuler(document.getElementById("rulerLeftSvg"),false);
+  buildVRuler(document.getElementById("rulerRightSvg"),true);
 }
-window.addEventListener('resize',function(){if(document.getElementById('view-ruler').classList.contains('active'))rulerInit();});
-/* Boot */
-var undoBtn,redoBtn,clearBtn;
-paintInit();route();
+window.addEventListener("resize",function(){if(document.getElementById("view-ruler").classList.contains("active"))rulerInit();});
+paintInit();
+route();
 })();
 </script>
 </body>
