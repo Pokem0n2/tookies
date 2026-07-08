@@ -52,10 +52,17 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 .ruler-frame{flex:1;display:flex;flex-direction:row;position:relative}
 .ruler-strip{width:36px;flex-shrink:0;background:#fff;overflow:hidden}
 .ruler-strip svg{width:100%;height:100%;display:block}
-.ruler-mid{flex:1;display:flex;align-items:center;justify-content:center;background:#fff;min-width:0}
-.ruler-mid .info{color:#aaa;font-size:12px;text-align:center;padding:8px}
+.ruler-mid{flex:1;position:relative;background:#fff;min-width:0;overflow:hidden}
+.ruler-mid .info{position:absolute;top:12px;left:50%;transform:translateX(-50%);color:#aaa;font-size:12px;text-align:center;padding:8px 12px;background:rgba(255,255,255,.85);border-radius:6px;z-index:1;pointer-events:none}
 .ruler-mid .info b{color:#555;font-weight:600}
 .ruler-mid .info .big{font-size:16px;color:#333;margin-bottom:4px}
+.ruler-mid .dist{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#e53935;font-size:20px;font-weight:700;text-align:center;padding:8px 14px;background:rgba(255,255,255,.92);border-radius:6px;border:1.5px solid #e53935;z-index:3;pointer-events:none;display:none;white-space:nowrap;line-height:1.3}
+.ruler-mid .dist.show{display:block}
+.ruler-mid .dist small{display:block;font-size:11px;font-weight:400;color:#888;margin-top:2px}
+.ruler-line{position:absolute;left:0;right:0;height:3px;background:#e53935;z-index:2;pointer-events:none;box-shadow:0 1px 3px rgba(229,57,53,.4)}
+.ruler-line.dragging{height:4px;background:#d32f2f;box-shadow:0 2px 6px rgba(229,57,53,.6)}
+.ruler-handle{position:absolute;left:50%;transform:translate(-50%,-50%);width:48px;height:24px;background:#e53935;border-radius:12px;cursor:grab;z-index:4;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.ruler-handle:active{cursor:grabbing;background:#d32f2f}
 </style>
 </head>
 <body>
@@ -84,12 +91,15 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 <div class="view" id="view-ruler">
 <div class="ruler-frame" id="rulerFrame">
 <div class="ruler-strip"><svg id="rulerLeftSvg"></svg></div>
-<div class="ruler-mid"><div class="info">
+<div class="ruler-mid" id="rulerMid">
+<div class="info">
 <div class="big">📐 屏幕尺</div>
 <div>宽度 <b id="devW">—</b></div>
 <div>高度 <b id="devH">—</b></div>
 <div style="margin-top:4px">对角线 <b id="diag">—</b></div>
-</div></div>
+</div>
+<div class="dist" id="distBox">—<small></small></div>
+</div>
 <div class="ruler-strip"><svg id="rulerRightSvg"></svg></div>
 </div>
 </div>
@@ -272,7 +282,123 @@ function buildVRuler(svg,flip){
   }
   svg.innerHTML=parts.join("");
 }
+/* Ruler lines */
+var lines=[]; /* array of {y, dom, handle} - y is in CSS px relative to rulerMid */
+var rulerMid,distBox;
+var dragging=null; /* {idx, startY, origY} */
+var MAX_LINES=2;
+var HIT_TOL=24; /* px hit tolerance for line drag */
+
+function createLine(yCss){
+  if(lines.length>=MAX_LINES)return;
+  var y=Math.max(0,Math.min(rulerMid.clientHeight,yCss));
+  var line=document.createElement("div");
+  line.className="ruler-line";
+  line.style.top=(y-1)+"px"; /* center the 3px line on y */
+  rulerMid.appendChild(line);
+  var handle=document.createElement("div");
+  handle.className="ruler-handle";
+  handle.style.top=y+"px";
+  handle.textContent=(lines.length+1);
+  rulerMid.appendChild(handle);
+  var obj={y:y,dom:line,handle:handle};
+  lines.push(obj);
+  handle.addEventListener("touchstart",function(e){onHandleDown(e,lines.length-1);},{passive:false});
+  handle.addEventListener("mousedown",function(e){onHandleDown(e,lines.length-1);});
+  updateDist();
+}
+function removeLine(idx){
+  var obj=lines[idx];
+  if(obj.dom)obj.dom.parentNode.removeChild(obj.dom);
+  if(obj.handle)obj.handle.parentNode.removeChild(obj.handle);
+  lines.splice(idx,1);
+  /* renumber remaining handles */
+  for(var i=0;i<lines.length;i++)lines[i].handle.textContent=(i+1);
+  updateDist();
+}
+function clearLines(){
+  while(lines.length)removeLine(lines.length-1);
+}
+function moveLine(idx,yCss){
+  var y=Math.max(0,Math.min(rulerMid.clientHeight,yCss));
+  lines[idx].y=y;
+  lines[idx].dom.style.top=(y-1)+"px";
+  lines[idx].handle.style.top=y+"px";
+  updateDist();
+}
+function hitTest(yCss){
+  /* find nearest line within tolerance */
+  var best=-1,bestD=Infinity;
+  for(var i=0;i<lines.length;i++){
+    var d=Math.abs(lines[i].y-yCss);
+    if(d<bestD){bestD=d;best=i;}
+  }
+  return bestD<=HIT_TOL?best:-1;
+}
+function getClientY(e){
+  var t=e.touches?e.touches[0]:e;
+  return t.clientY;
+}
+function yInRuler(clientY){
+  var r=rulerMid.getBoundingClientRect();
+  return clientY-r.top;
+}
+function onMidDown(e){
+  if(e.touches)e.preventDefault();
+  var clientY=getClientY(e);
+  var y=yInRuler(clientY);
+  var hit=hitTest(y);
+  if(hit>=0){
+    /* dragging existing line */
+    dragging={idx:hit,startY:clientY,origY:lines[hit].y};
+    lines[hit].dom.classList.add("dragging");
+  }else if(lines.length<MAX_LINES){
+    /* create new line at this y */
+    createLine(y);
+    /* start dragging it immediately so it follows finger smoothly */
+    dragging={idx:lines.length-1,startY:clientY,origY:lines[lines.length-1].y};
+    lines[lines.length-1].dom.classList.add("dragging");
+  }
+}
+function onMidMove(e){
+  if(!dragging)return;
+  if(e.touches)e.preventDefault();
+  var clientY=getClientY(e);
+  var y=yInRuler(clientY);
+  moveLine(dragging.idx,y);
+}
+function onMidUp(e){
+  if(!dragging)return;
+  lines[dragging.idx].dom.classList.remove("dragging");
+  dragging=null;
+}
+function onHandleDown(e,idx){
+  e.preventDefault();
+  e.stopPropagation();
+  var clientY=getClientY(e);
+  dragging={idx:idx,startY:clientY,origY:lines[idx].y};
+  lines[idx].dom.classList.add("dragging");
+}
+function updateDist(){
+  if(lines.length===2){
+    var a=lines[0].y,b=lines[1].y;
+    var dpx=Math.abs(a-b);
+    var dmm=dpx/PX_PER_MM;
+    var dcm=dmm/10;
+    distBox.innerHTML=(dmm>=10?dcm.toFixed(2)+' cm':dmm.toFixed(1)+' mm')+'<small>'+dpx.toFixed(0)+' px</small>';
+    var midY=(a+b)/2;
+    distBox.style.top=midY+"px";
+    distBox.classList.add("show");
+  }else{
+    distBox.classList.remove("show");
+  }
+}
+
 function rulerInit(){
+  rulerMid=document.getElementById("rulerMid");
+  distBox=document.getElementById("distBox");
+  /* clear any existing lines (e.g. on re-enter) */
+  clearLines();
   var dpr=window.devicePixelRatio||1;
   var sw=window.screen.width,sh=window.screen.height;
   var dpi=dpr*160;
@@ -283,6 +409,15 @@ function rulerInit(){
   document.getElementById("diag").textContent=diag.toFixed(2)+"″ ("+(diag*2.54).toFixed(1)+" cm)";
   buildVRuler(document.getElementById("rulerLeftSvg"),false);
   buildVRuler(document.getElementById("rulerRightSvg"),true);
+  /* bind rulerMid drag/create events */
+  rulerMid.addEventListener("touchstart",onMidDown,{passive:false});
+  rulerMid.addEventListener("mousedown",onMidDown);
+  rulerMid.addEventListener("touchmove",onMidMove,{passive:false});
+  rulerMid.addEventListener("mousemove",onMidMove);
+  rulerMid.addEventListener("touchend",onMidUp);
+  rulerMid.addEventListener("touchcancel",onMidUp);
+  rulerMid.addEventListener("mouseup",onMidUp);
+  rulerMid.addEventListener("mouseleave",onMidUp);
 }
 window.addEventListener("resize",function(){if(document.getElementById("view-ruler").classList.contains("active"))rulerInit();});
 paintInit();
