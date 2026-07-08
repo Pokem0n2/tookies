@@ -124,7 +124,7 @@ function redrawAll(){ctx.clearRect(0,0,cv.width,cv.height);for(var i=0;i<strokes
 function getPos(e){var r=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
 function paintStart(e){e.preventDefault();drawing=true;redoStack.length=0;var p=getPos(e);current={color:isEraser?'#ffffff':currentColor,size:currentSize,points:[p]};strokes.push(current);drawStroke(current);}
 function paintMove(e){if(!drawing)return;e.preventDefault();var p=getPos(e);var last=current.points[current.points.length-1];if(Math.abs(p.x-last.x)<1.5&&Math.abs(p.y-last.y)<1.5)return;current.points.push(p);ctx.strokeStyle=current.color;ctx.lineWidth=current.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();}
-function paintEnd(e){if(!drawing)return;e&&e.preventDefault();drawing=false;if(current&¤t.points.length===0)strokes.pop();current=null;}
+function paintEnd(e){if(!drawing)return;e&&e.preventDefault();drawing=false;if(current&&t.points.length===0)strokes.pop();current=null;}
 function setColor(c){currentColor=c;isEraser=false;eraserBtn.classList.remove('on');updateColorBtn();}
 function setEraser(){isEraser=true;eraserBtn.classList.add('on');colorBtn.style.background='#fff';}
 /* color wheel */
