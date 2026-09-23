@@ -50,6 +50,8 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 .color-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.8);box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .brush-preview{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:#9e9e9e;box-shadow:0 0 0 1.5px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .12s;z-index:200}
 .brush-preview.show{opacity:.9}
+.eraser-cursor{position:fixed;border:1.5px dashed #e53935;border-radius:50%;pointer-events:none;display:none;z-index:150;box-sizing:border-box;box-shadow:0 0 0 .5px rgba(255,255,255,.6)}
+.eraser-cursor.show{display:block}
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;z-index:110;align-items:center;justify-content:center}
 .confirm-overlay.show{display:flex}
 .confirm-box{background:#fff;border-radius:14px;width:262px;padding:20px 18px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);animation:cw .15s ease-out}
@@ -102,6 +104,7 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 </div>
 <div class="color-overlay" id="colorOverlay"><div class="color-wheel" id="colorWheel"></div></div>
 <div class="brush-preview" id="brushPreview"></div>
+<div class="eraser-cursor" id="eraserCursor"></div>
 <div class="confirm-overlay" id="confirmOverlay">
 <div class="confirm-box">
 <div class="confirm-title">温馨请示：</div>
@@ -166,11 +169,26 @@ function route(){
   else show("view-home");
 }
 window.addEventListener("hashchange",route);
-var cv,ctx,sizeEl,sizeVal,eraserBtn,colorBtn,colorOverlay,colorWheel,undoBtn,redoBtn,clearBtn,confirmOverlay,confirmYes,confirmNo,brushPreview;
+var cv,ctx,sizeEl,sizeVal,eraserBtn,colorBtn,colorOverlay,colorWheel,undoBtn,redoBtn,clearBtn,confirmOverlay,confirmYes,confirmNo,brushPreview,eraserCursor;
+var eraserCursorTimer=0;
+/* 橡皮擦轮廓跟随：显示擦除边界（画布坐标 → 屏幕坐标需含画布偏移） */
+function showEraserCursor(clientX,clientY){
+  var r=cv.getBoundingClientRect();
+  var size=Math.max(currentSize,10); /* 轮廓不小于 10px，太小看不清 */
+  eraserCursor.style.width=size+"px";
+  eraserCursor.style.height=size+"px";
+  eraserCursor.style.left=(clientX-50-size/2)+"px";
+  eraserCursor.style.top=(clientY-50-size/2)+"px";
+  eraserCursor.classList.add("show");
+  clearTimeout(eraserCursorTimer);
+  eraserCursorTimer=setTimeout(function(){eraserCursor.classList.remove("show");},900);
+}
 var strokes=[],redoStack=[],current=null,drawing=false;
 var currentColor="#000000",currentSize=2,isEraser=false;
-var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#ffffff"];
+var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#9e9e9e"];
 var BRUSH_PREVIEW_MS=700,brushTimer=0;
+/* 笔迹相对手指触点的偏移（左上 45°），避免手指遮挡笔迹 */
+var BRUSH_OFFSET=50;
 function updateBrushPreview(){
   brushPreview.style.width=currentSize+"px";
   brushPreview.style.height=currentSize+"px";
@@ -204,13 +222,19 @@ function redrawAll(){
 function getPos(e){
   var r=cv.getBoundingClientRect();
   var t=e.touches?e.touches[0]:e;
-  /* 起笔点向触点左上 45° 偏移 20px，避免手指遮挡笔迹 */
-  return{x:t.clientX-r.left-20,y:t.clientY-r.top-20};
+  /* 起笔点向触点左上 45° 偏移 BRUSH_OFFSET，避免手指遮挡笔迹 */
+  return{x:t.clientX-r.left-BRUSH_OFFSET,y:t.clientY-r.top-BRUSH_OFFSET};
+}
+/* 取原始触点（不偏移），供橡皮擦轮廓定位用 */
+function getRawPos(e){
+  var t=e.touches?e.touches[0]:e;
+  return{x:t.clientX,y:t.clientY};
 }
 function paintStart(e){
   e.preventDefault();
   drawing=true;redoStack.length=0;
   var p=getPos(e);
+  if(isEraser){var rp=getRawPos(e);showEraserCursor(rp.x,rp.y);}
   current={color:isEraser?"#ffffff":currentColor,size:currentSize,points:[p]};
   strokes.push(current);drawStroke(current);
 }
@@ -218,6 +242,7 @@ function paintMove(e){
   if(!drawing)return;
   e.preventDefault();
   var p=getPos(e);
+  if(isEraser){var rp=getRawPos(e);showEraserCursor(rp.x,rp.y);}
   var last=current.points[current.points.length-1];
   if(Math.abs(p.x-last.x)<1.5 && Math.abs(p.y-last.y)<1.5)return;
   current.points.push(p);
@@ -239,6 +264,9 @@ function setColor(c){
 function setEraser(){
   isEraser=true;eraserBtn.classList.add("on");
   colorBtn.style.background="#fff";
+  /* 激活橡皮擦时在屏幕中心显示轮廓预览，提示当前擦除范围 */
+  var r=cv.getBoundingClientRect();
+  showEraserCursor(r.left+r.width/2,r.top+r.height/2);
 }
 function buildWheel(){
   colorWheel.innerHTML="";
@@ -271,7 +299,7 @@ function paintInit(){
   colorOverlay=document.getElementById("colorOverlay");colorWheel=document.getElementById("colorWheel");
   undoBtn=document.getElementById("undoBtn");redoBtn=document.getElementById("redoBtn");clearBtn=document.getElementById("clearBtn");
   confirmOverlay=document.getElementById("confirmOverlay");confirmYes=document.getElementById("confirmYes");confirmNo=document.getElementById("confirmNo");
-  brushPreview=document.getElementById("brushPreview");
+  brushPreview=document.getElementById("brushPreview");eraserCursor=document.getElementById("eraserCursor");
   updateColorBtn();buildWheel();
   colorBtn.addEventListener("click",openWheel);
   colorOverlay.addEventListener("click",closeWheel);
