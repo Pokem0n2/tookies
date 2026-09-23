@@ -51,7 +51,7 @@ $Y --output "$BUILD_DIR/dex" \
   --min-api 21 \
   --lib "$ANDROID_JAR" \
   --release \
-  "$BUILD_DIR/obj/com/tookies/app/MainActivity.class"
+  "$BUILD_DIR/obj/com/tookies/app/"*.class
 echo "=== 3. aapt2 compile ==="
 $X compile -o "$BUILD_DIR/compiled/" --dir "$APK_DIR/res"
 echo "=== 4. aapt2 link ==="
