@@ -202,12 +202,12 @@ var strokes=[],redoStack=[],current=null,drawing=false;
 var currentColor="#000000",currentSize=2,isEraser=false;
 var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#9e9e9e"];
 var BRUSH_PREVIEW_MS=700,brushTimer=0;
-/* 笔迹相对手指触点的偏移：触点(x,y) → 落笔(x-40,y-20)，避开手指遮挡 */
-var BRUSH_OFFSET_X=40,BRUSH_OFFSET_Y=20;
-/* 触点后延迟落笔时间：前 3s 只跟随显示落笔位置预览，不实际绘制 */
-var DRAW_DELAY_MS=3000,delayTimer=0,armed=false;
+/* 笔迹相对手指触点的偏移：触点(x,y) → 落笔(x-45,y-25)，避开手指遮挡 */
+var BRUSH_OFFSET_X=45,BRUSH_OFFSET_Y=25;
+/* 触点后延迟落笔时间：前 1s 只跟随显示落笔位置预览，不实际绘制 */
+var DRAW_DELAY_MS=1000,delayTimer=0,armed=false;
 /* 上一次笔触结束位置（画布坐标），橡皮擦激活时圆圈定位用 */
-var lastInkEnd=null;
+var lastInkEnd=null,lastFingerEnd=null;
 function updateBrushPreview(){
   brushPreview.style.width=currentSize+"px";
   brushPreview.style.height=currentSize+"px";
@@ -255,6 +255,7 @@ function paintStart(e){
   drawing=true;armed=false;redoStack.length=0;
   var rp=getRawPos(e);
   showTouchDot(rp.x,rp.y);
+  pendingRaw=rp;
   var p=getPos(e);
   current={color:isEraser?"#ffffff":currentColor,size:currentSize,points:[]};
   strokes.push(current);
@@ -270,12 +271,15 @@ function paintStart(e){
 }
 /* 当前触点位置（画布坐标），延迟到期落笔时取用 */
 var pendingPos=null;
+/* 当前触点原始坐标（画布系，无偏移）：抬手时记录为手指最后位置 */
+var pendingRaw=null;
 function paintMove(e){
   if(!drawing)return;
   e.preventDefault();
   var p=getPos(e);
   pendingPos=p;
   var rp=getRawPos(e);
+  pendingRaw=rp;
   if(!armed){
     /* 预览期内：预览点跟随手指 */
     showTouchDot(rp.x,rp.y);
@@ -295,9 +299,11 @@ function paintEnd(e){
   drawing=false;
   clearTimeout(delayTimer);
   hideTouchDot();
-  /* 预览期内抬手：无实际笔迹，不入撤销栈；否则记录终点供橡皮擦定位 */
+  /* 有实际笔迹：记录墨迹终点；预览期内抬手：笔迹出栈不入撤销 */
   if(current&&current.points.length){lastInkEnd=current.points[current.points.length-1];}
   else strokes.pop();
+  /* 记录手指最后触点（画布坐标，无落笔偏移）：橡皮擦圆圈定位用 */
+  if(pendingRaw){var cvr=cv.getBoundingClientRect();lastFingerEnd={x:pendingRaw.x-cvr.left,y:pendingRaw.y-cvr.top};}
   armed=false;pendingPos=null;current=null;
 }
 function setColor(c){
@@ -308,8 +314,8 @@ function setColor(c){
 function setEraser(){
   isEraser=true;eraserBtn.classList.add("on");
   colorBtn.style.background="#fff";
-  /* 激活橡皮擦：圆圈显示在上一次笔触结束位置；无历史笔迹则画布中心 */
-  if(lastInkEnd){showEraserCursor(lastInkEnd.x,lastInkEnd.y);}
+  /* 激活橡皮擦：圆圈显示在手指最后触点位置（原始坐标，无落笔偏移）；无历史则画布中心 */
+  if(lastFingerEnd){showEraserCursor(lastFingerEnd.x,lastFingerEnd.y);}
   else{
     var r=cv.getBoundingClientRect();
     showEraserCursor(r.width/2,r.height/2);
