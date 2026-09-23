@@ -48,6 +48,19 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 .color-dot{position:absolute;width:38px;height:38px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;transform:translate(-50%,-50%);transition:transform .1s}
 .color-dot:active{transform:translate(-50%,-50%) scale(1.2)}
 .color-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.8);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.brush-preview{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:#9e9e9e;box-shadow:0 0 0 1.5px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .12s;z-index:200}
+.brush-preview.show{opacity:.9}
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.25);display:none;z-index:110;align-items:center;justify-content:center}
+.confirm-overlay.show{display:flex}
+.confirm-box{background:#fff;border-radius:14px;width:262px;padding:20px 18px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);animation:cw .15s ease-out}
+.confirm-title{font-size:15px;font-weight:700;color:#222;margin-bottom:8px}
+.confirm-msg{font-size:14px;color:#444;line-height:1.5;margin-bottom:16px}
+.confirm-btns{display:flex;gap:10px}
+.confirm-btns button{flex:1;height:38px;border:none;border-radius:9px;font-size:15px;cursor:pointer;font-family:inherit}
+.confirm-btns .no{background:#f2f2f2;color:#444}
+.confirm-btns .yes{background:#222;color:#fff}
+.confirm-btns .no:active{background:#e4e4e4}
+.confirm-btns .yes:active{background:#000}
 #view-ruler{background:#fff}
 .ruler-frame{flex:1;display:flex;flex-direction:row;position:relative}
 .ruler-strip{width:36px;flex-shrink:0;background:#fff;overflow:hidden}
@@ -88,6 +101,17 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 </div>
 </div>
 <div class="color-overlay" id="colorOverlay"><div class="color-wheel" id="colorWheel"></div></div>
+<div class="brush-preview" id="brushPreview"></div>
+<div class="confirm-overlay" id="confirmOverlay">
+<div class="confirm-box">
+<div class="confirm-title">温馨请示：</div>
+<div class="confirm-msg">是否清空涂鸦板？</div>
+<div class="confirm-btns">
+<button class="no" id="confirmNo">否</button>
+<button class="yes" id="confirmYes">是</button>
+</div>
+</div>
+</div>
 <div class="view" id="view-ruler">
 <div class="ruler-frame" id="rulerFrame">
 <div class="ruler-strip"><svg id="rulerLeftSvg"></svg></div>
@@ -107,7 +131,7 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 <script>
 (function(){
 var TOOLS=[
-{id:"paint",label:"简易画板",icon:'<svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="6" cy="6" r="1.5" fill="#222" stroke="none"/></svg>'},
+{id:"paint",label:"涂鸦板",icon:'<svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="6" cy="6" r="1.5" fill="#222" stroke="none"/></svg>'},
 {id:"ruler",label:"屏幕尺",icon:'<svg viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="5" rx="1"/><line x1="7" y1="2" x2="7" y2="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="17" y1="2" x2="17" y2="5"/><line x1="3" y1="7" x2="3" y2="22"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="6" y1="15" x2="6" y2="19"/></svg>'},
 {id:"calc",label:"计算器",icon:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="13" x2="10" y2="13"/><line x1="12" y1="13" x2="14" y2="13"/><line x1="16" y1="13" x2="16" y2="13"/><line x1="8" y1="16" x2="10" y2="16"/><line x1="12" y1="16" x2="14" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/><line x1="8" y1="19" x2="10" y2="19"/><line x1="12" y1="19" x2="14" y2="19"/><line x1="16" y1="19" x2="16" y2="14"/></svg>'}
 ];
@@ -137,15 +161,23 @@ function show(v,t){
 backBtn.addEventListener("click",function(){show("view-home");});
 function route(){
   var h=location.hash.replace("#","");
-  if(h==="paint")show("view-paint","简易画板");
+  if(h==="paint")show("view-paint","涂鸦板");
   else if(h==="ruler")show("view-ruler","屏幕尺");
   else show("view-home");
 }
 window.addEventListener("hashchange",route);
-var cv,ctx,sizeEl,sizeVal,eraserBtn,colorBtn,colorOverlay,colorWheel,undoBtn,redoBtn,clearBtn;
+var cv,ctx,sizeEl,sizeVal,eraserBtn,colorBtn,colorOverlay,colorWheel,undoBtn,redoBtn,clearBtn,confirmOverlay,confirmYes,confirmNo,brushPreview;
 var strokes=[],redoStack=[],current=null,drawing=false;
 var currentColor="#000000",currentSize=2,isEraser=false;
 var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#ffffff"];
+var BRUSH_PREVIEW_MS=700,brushTimer=0;
+function updateBrushPreview(){
+  brushPreview.style.width=currentSize+"px";
+  brushPreview.style.height=currentSize+"px";
+  brushPreview.classList.add("show");
+  clearTimeout(brushTimer);
+  brushTimer=setTimeout(function(){brushPreview.classList.remove("show");},BRUSH_PREVIEW_MS);
+}
 function updateColorBtn(){colorBtn.style.background=currentColor;}
 function paintResize(){
   cv=document.getElementById("cv");
@@ -172,7 +204,8 @@ function redrawAll(){
 function getPos(e){
   var r=cv.getBoundingClientRect();
   var t=e.touches?e.touches[0]:e;
-  return{x:t.clientX-r.left,y:t.clientY-r.top};
+  /* 起笔点向触点左上 45° 偏移 20px，避免手指遮挡笔迹 */
+  return{x:t.clientX-r.left-20,y:t.clientY-r.top-20};
 }
 function paintStart(e){
   e.preventDefault();
@@ -237,15 +270,22 @@ function paintInit(){
   eraserBtn=document.getElementById("eraserBtn");colorBtn=document.getElementById("colorBtn");
   colorOverlay=document.getElementById("colorOverlay");colorWheel=document.getElementById("colorWheel");
   undoBtn=document.getElementById("undoBtn");redoBtn=document.getElementById("redoBtn");clearBtn=document.getElementById("clearBtn");
+  confirmOverlay=document.getElementById("confirmOverlay");confirmYes=document.getElementById("confirmYes");confirmNo=document.getElementById("confirmNo");
+  brushPreview=document.getElementById("brushPreview");
   updateColorBtn();buildWheel();
   colorBtn.addEventListener("click",openWheel);
   colorOverlay.addEventListener("click",closeWheel);
   colorWheel.addEventListener("click",function(e){e.stopPropagation();});
-  sizeEl.addEventListener("input",function(){currentSize=parseInt(sizeEl.value,10);sizeVal.textContent=currentSize;});
+  sizeEl.addEventListener("input",function(){currentSize=parseInt(sizeEl.value,10);sizeVal.textContent=currentSize;updateBrushPreview();});
   eraserBtn.addEventListener("click",setEraser);
   undoBtn.addEventListener("click",function(){if(strokes.length){redoStack.push(strokes.pop());redrawAll();}});
   redoBtn.addEventListener("click",function(){if(redoStack.length){strokes.push(redoStack.pop());redrawAll();}});
-  clearBtn.addEventListener("click",function(){if(!strokes.length)return;if(confirm("确定清空画板？")){strokes.length=0;redoStack.length=0;redrawAll();}});
+  clearBtn.addEventListener("click",function(){if(!strokes.length)return;confirmOverlay.classList.add("show");});
+  confirmNo.addEventListener("click",function(){confirmOverlay.classList.remove("show");});
+  confirmYes.addEventListener("click",function(){
+    confirmOverlay.classList.remove("show");
+    strokes.length=0;redoStack.length=0;redrawAll();
+  });
   cv.addEventListener("touchstart",paintStart,{passive:false});
   cv.addEventListener("mousedown",paintStart);
   cv.addEventListener("touchmove",paintMove,{passive:false});
