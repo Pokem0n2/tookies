@@ -193,8 +193,8 @@ function showTouchDot(clientX,clientY){
   touchDot.style.width=size+"px";
   touchDot.style.height=size+"px";
   touchDot.style.background=isEraser?"#e53935":"#222";
-  touchDot.style.left=(clientX-35-size/2)+"px";
-  touchDot.style.top=(clientY-15-size/2)+"px";
+  touchDot.style.left=(clientX-BRUSH_OFFSET_X-size/2)+"px";
+  touchDot.style.top=(clientY-BRUSH_OFFSET_Y-size/2)+"px";
   touchDot.classList.add("show");
 }
 function hideTouchDot(){touchDot.classList.remove("show");}
@@ -202,8 +202,8 @@ var strokes=[],redoStack=[],current=null,drawing=false;
 var currentColor="#000000",currentSize=2,isEraser=false;
 var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#9e9e9e"];
 var BRUSH_PREVIEW_MS=700,brushTimer=0;
-/* 笔迹相对手指触点的偏移：触点(x,y) → 落笔(x-35,y-15)，避开手指遮挡 */
-var BRUSH_OFFSET_X=35,BRUSH_OFFSET_Y=15;
+/* 笔迹相对手指触点的偏移：触点(x,y) → 落笔(x-40,y-20)，避开手指遮挡 */
+var BRUSH_OFFSET_X=40,BRUSH_OFFSET_Y=20;
 /* 触点后延迟落笔时间：前 3s 只跟随显示落笔位置预览，不实际绘制 */
 var DRAW_DELAY_MS=3000,delayTimer=0,armed=false;
 /* 上一次笔触结束位置（画布坐标），橡皮擦激活时圆圈定位用 */
@@ -241,7 +241,7 @@ function redrawAll(){
 function getPos(e){
   var r=cv.getBoundingClientRect();
   var t=e.touches?e.touches[0]:e;
-  /* 落笔位置相对触点偏移 (x-35, y-15)，避开手指遮挡 */
+  /* 落笔位置相对触点偏移 (x-40, y-20)，避开手指遮挡 */
   return{x:t.clientX-r.left-BRUSH_OFFSET_X,y:t.clientY-r.top-BRUSH_OFFSET_Y};
 }
 /* 取原始触点（client 坐标），供预览点定位用 */
@@ -259,18 +259,16 @@ function paintStart(e){
   current={color:isEraser?"#ffffff":currentColor,size:currentSize,points:[]};
   strokes.push(current);
   clearTimeout(delayTimer);
+  var startPos=p;
   delayTimer=setTimeout(function(){
-    /* 3s 到：手指仍按住才开始实际绘制；起点取当前触点 */
+    /* 3s 到：手指仍按住才开始实际绘制；起点=当前触点（若期间未移动则用初始触点） */
     if(!drawing){return;}
     armed=true;
-    var t=currentLastPos();
-    if(t){current.points.push(t);drawStroke(current);}
+    current.points.push(pendingPos||startPos);
+    /* 单点 drawStroke 无墨（Canvas fill 特性），墨迹由后续 move 画线产生 */
   },DRAW_DELAY_MS);
 }
-/* 当前触点的画布坐标（延迟到期的落笔起点） */
-function currentLastPos(){
-  return pendingPos;
-}
+/* 当前触点位置（画布坐标），延迟到期落笔时取用 */
 var pendingPos=null;
 function paintMove(e){
   if(!drawing)return;
@@ -285,7 +283,6 @@ function paintMove(e){
     return;
   }
   if(isEraser)showEraserCursor(p.x,p.y);
-  if(!current.points.length){current.points.push(p);drawStroke(current);return;}
   var last=current.points[current.points.length-1];
   if(Math.abs(p.x-last.x)<1.5 && Math.abs(p.y-last.y)<1.5)return;
   current.points.push(p);
