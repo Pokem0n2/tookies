@@ -5,7 +5,8 @@
 ## 已实现工具
 
 - **简易画板**：画布、调色盘（8 色）、粗细滑轨（1-30px）、橡皮擦、单步撤销/恢复、一键清屏
-- **屏幕尺**：屏幕长边左右精确刻度尺（mm/cm/inch 三种单位自动换算）
+- **屏幕尺**：屏幕长边左右精确刻度尺（mm/cm/inch 三种单位自动换算）、双刻度线拖拽测距
+- **计算器（xCalc）**：[tydlig-android](https://github.com/Pokem0n2/tydlig-android) 成品嵌入。无限画布数字连线、结果实时联动、科学函数、撤销/重做、画布自动保存与导出分享
 
 ## 后续规划
 
@@ -34,7 +35,8 @@ apk/
 ├── AndroidManifest.xml      # 应用清单（minSdk 21, targetSdk 34）
 ├── build.sh                 # 构建脚本
 ├── assets/
-│   └── index.html           # 单文件 SPA（主页+画板+屏幕尺）
+│   ├── index.html           # 单文件 SPA（主页+画板+屏幕尺）
+│   └── calc.html            # xCalc 画布计算器（独立页面，tydlig-android v0.4.7）
 ├── res/
 │   ├── drawable/
 │   │   └── ic_launcher_foreground.xml   # 自适应图标前景

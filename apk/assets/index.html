@@ -108,14 +108,18 @@ canvas{flex:1;display:block;background:#fff;touch-action:none}
 (function(){
 var TOOLS=[
 {id:"paint",label:"简易画板",icon:'<svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="6" cy="6" r="1.5" fill="#222" stroke="none"/></svg>'},
-{id:"ruler",label:"屏幕尺",icon:'<svg viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="5" rx="1"/><line x1="7" y1="2" x2="7" y2="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="17" y1="2" x2="17" y2="5"/><line x1="3" y1="7" x2="3" y2="22"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="6" y1="15" x2="6" y2="19"/></svg>'}
+{id:"ruler",label:"屏幕尺",icon:'<svg viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="5" rx="1"/><line x1="7" y1="2" x2="7" y2="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="17" y1="2" x2="17" y2="5"/><line x1="3" y1="7" x2="3" y2="22"/><line x1="6" y1="7" x2="6" y2="11"/><line x1="6" y1="15" x2="6" y2="19"/></svg>'},
+{id:"calc",label:"计算器",icon:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="13" x2="10" y2="13"/><line x1="12" y1="13" x2="14" y2="13"/><line x1="16" y1="13" x2="16" y2="13"/><line x1="8" y1="16" x2="10" y2="16"/><line x1="12" y1="16" x2="14" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/><line x1="8" y1="19" x2="10" y2="19"/><line x1="12" y1="19" x2="14" y2="19"/><line x1="16" y1="19" x2="16" y2="14"/></svg>'}
 ];
 var grid=document.getElementById("grid");
 TOOLS.forEach(function(t){
   var el=document.createElement("div");
   el.className="tile";
   el.innerHTML='<div class="tile-icon">'+t.icon+'</div><div class="tile-label">'+t.label+'</div>';
-  el.addEventListener("click",function(){location.hash="#"+t.id;});
+  el.addEventListener("click",function(){
+    if(t.id==="calc"){location.href="calc.html";return;}
+    location.hash="#"+t.id;
+  });
   grid.appendChild(el);
 });
 var topbar=document.getElementById("topbar"),topTitle=document.getElementById("topTitle"),backBtn=document.getElementById("backBtn");
