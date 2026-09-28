@@ -45,7 +45,7 @@ echo "Manifest version: code=$VERSION_CODE name=$VERSION"
 echo "=== 1. Compile Java ==="
 javac -source 8 -target 8 -bootclasspath "$ANDROID_JAR" \
   -d "$BUILD_DIR/obj" \
-  "$APK_DIR/src/com/tookies/app/MainActivity.java"
+  "$APK_DIR"/src/com/tookies/app/*.java
 echo "=== 2. DEX ==="
 $Y --output "$BUILD_DIR/dex" \
   --min-api 21 \

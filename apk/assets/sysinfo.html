@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>系统信息</title>
+<style>
+  /* 暖色浅底为主，跟随系统深色时切到暖炭色（避免冷蓝紫） */
+  :root{
+    --bg:#FBEFD9; --card:#FFFDF6; --line:#EADFC8;
+    --text:#4A3B2A; --dim:#9A8A72; --accent:#C96A1E; --accent-soft:#F5E3C8;
+    --mono:ui-monospace,'Roboto Mono',Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#2B2620; --card:#37312A; --line:#4A4238; --text:#EDE4D6; --dim:#A79A86; --accent:#E8A44F; --accent-soft:#4A3E2E; }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);
+       font-family:system-ui,-apple-system,'Noto Sans SC',sans-serif;
+       padding:12px 14px 40px;-webkit-tap-highlight-color:transparent}
+  header{display:flex;align-items:center;gap:10px;padding:4px 2px 12px}
+  header h1{font-size:20px;font-weight:700;flex:1}
+  header .ver{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;
+       padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:active{opacity:.8}
+  .toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%) translateY(20px);
+         background:rgba(0,0,0,.75);color:#fff;font-size:13px;border-radius:8px;
+         padding:8px 16px;opacity:0;pointer-events:none;transition:all .25s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        margin-bottom:12px;overflow:hidden}
+  .card .head{display:flex;align-items:center;padding:0 16px;height:44px;cursor:pointer;
+              user-select:none}
+  .card .head h2{font-size:13px;color:var(--accent);font-weight:600;
+                 letter-spacing:.08em;flex:1}
+  .card .head .arrow{color:var(--dim);font-size:11px;transition:transform .2s}
+  .card.closed .arrow{transform:rotate(-90deg)}
+  .card .body{padding:0 16px 10px;border-top:1px dashed var(--line)}
+  .card.closed .body{display:none}
+  .row{display:flex;justify-content:space-between;gap:14px;
+       padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--dim);flex:none}
+  .row .v{font-family:var(--mono);text-align:right;word-break:break-all}
+  /* 长值允许按段换行（指纹/GPU API/WebView 版本等），每段独占一行右对齐 */
+  .v.multiline{white-space:pre-line;word-break:normal}
+  .v.na{color:var(--dim);opacity:.6}
+  .copied{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+  .loading{padding:10px 0;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <button id="tk-back" aria-label="返回 Tookies" style="width:36px;height:36px;margin-right:2px;border:none;background:transparent;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--accent);cursor:pointer;">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>
+  </button>
+  <h1>系统信息</h1>
+  <span class="ver" id="appver"></span>
+  <button class="btn" id="copyAll">复制全部</button>
+</header>
+<div id="cards"></div>
+<div class="toast" id="toast">已复制</div>
+<script>
+'use strict';
+
+/* ============ 通用渲染层 ============ */
+
+/** 组定义表：每组一个标题 + 一个取数函数（返回 [ [键,值], ... ] 或 null）。
+ *  后续版本往 GROUPS 里追加组即可，渲染逻辑不用动。 */
+const GROUPS = [
+  { title: '设备', fetch: fetchDevice },
+  { title: '内存', fetch: fetchMemory },
+  { title: '闪存', fetch: fetchFlash },
+  { title: '显示', fetch: fetchDisplay },
+  { title: '存储', fetch: fetchStorageStat },
+  { title: '系统', fetch: fetchSystem },
+  { title: '处理器', fetch: fetchCpu },
+  { title: '图形', fetch: fetchGpu },
+  { title: '电池', fetch: fetchBattery },
+  { title: '其他', fetch: fetchMisc },
+];
+
+const cards = document.getElementById('cards');
+
+/** 全部行的原始数据，复制报告时用（[组标题, rows] 数组） */
+let report = [];
+
+/** 渲染一个组为一张卡片（可点击标题折叠） */
+function renderGroup(title, rows) {
+  report.push([title, rows]);
+  const card = document.createElement('div');
+  card.className = 'card';
+  const head = document.createElement('div');
+  head.className = 'head';
+  const h = document.createElement('h2');
+  h.textContent = title;
+  head.appendChild(h);
+  const arrow = document.createElement('span');
+  arrow.className = 'arrow';
+  arrow.textContent = '▼';
+  head.appendChild(arrow);
+  const body = document.createElement('div');
+  body.className = 'body';
+  card.appendChild(head);
+  card.appendChild(body);
+  head.addEventListener('click', () => card.classList.toggle('closed'));
+
+  if (rows) {
+    for (const [k, v] of rows) {
+      const r = document.createElement('div');
+      r.className = 'row';
+      const ke = document.createElement('span');
+      ke.className = 'k'; ke.textContent = k;
+      const ve = document.createElement('span');
+      ve.className = 'v';
+      if (v === null || v === undefined || v === '') {
+        ve.textContent = '不可用';
+        ve.className += ' na';
+      } else {
+        // 数组值 = 显式多行（各取数函数已按规则拆好段）
+        if (Array.isArray(v)) {
+          ve.classList.add('multiline');
+          ve.textContent = v.join('\n');
+        } else {
+          ve.textContent = v;
+        }
+        // 单值点击即复制该值（多行值复制原始拼接文本）
+        const raw = Array.isArray(v) ? v.join('\n') : String(v);
+        ve.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          copyText(raw, ve);
+        });
+      }
+      r.appendChild(ke); r.appendChild(ve);
+      body.appendChild(r);
+    }
+  } else {
+    const l = document.createElement('div');
+    l.className = 'loading'; l.textContent = '读取失败';
+    body.appendChild(l);
+  }
+  cards.appendChild(card);
+}
+
+/** 安全解析桥返回的 JSON */
+function parseBridge(json) {
+  try { return JSON.parse(json); } catch (e) { return null; }
+}
+
+/** 桥缺失时的兜底（例如页面被外部浏览器打开） */
+function noBridge() {
+  return !window.NativeInfo;
+}
+
+/** 复制文本并给出轻量反馈（整页 toast / 单值高亮） */
+function copyText(text, highlightEl) {
+  let ok = false;
+  if (!noBridge() && NativeInfo.copyToClipboard) {
+    ok = !!NativeInfo.copyToClipboard(text);
+  }
+  if (!ok) {
+    // 兜底：老 WebView 无桥复制时用 execCommand
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+  }
+  if (ok) {
+    if (highlightEl) {
+      highlightEl.classList.add('copied');
+      setTimeout(() => highlightEl.classList.remove('copied'), 600);
+    } else {
+      showToast('已复制到剪贴板');
+    }
+  } else {
+    showToast('复制失败');
+  }
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/** 汇总报告为纯文本（组名 + 键值行） */
+function buildReportText() {
+  const lines = [];
+  for (const [title, rows] of report) {
+    lines.push('【' + title + '】');
+    if (rows) {
+      for (const [k, v] of rows) {
+        const val = Array.isArray(v) ? v.join(' ') : v;
+        lines.push(k + '：' + (val === null || val === undefined || val === '' ? '不可用' : val));
+      }
+    } else {
+      lines.push('读取失败');
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/* ============ 格式化 ============ */
+
+/** 字节数 → 人类可读（GB 用 10^9 近似、保留 1 位小数即可对上标称值） */
+function fmtBytes(n) {
+  if (n === null || n === undefined || isNaN(n)) return null;
+  const gb = n / 1e9;
+  return gb.toFixed(1) + ' GB (' + n.toLocaleString() + ' B)';
+}
+
+/** 毫秒 → X 天 X 小时 X 分（启动时长用） */
+function fmtUptime(ms) {
+  if (ms === null || ms === undefined || isNaN(ms)) return null;
+  const m = Math.floor(ms / 60000);
+  const days = Math.floor(m / 1440);
+  const hours = Math.floor((m % 1440) / 60);
+  const mins = m % 60;
+  let out = '';
+  if (days > 0) out += days + ' 天 ';
+  if (hours > 0 || days > 0) out += hours + ' 小时 ';
+  out += mins + ' 分钟';
+  return out;
+}
+
+/** kHz → GHz（CPU 集群频率） */
+function fmtKHz(k) {
+  if (k === null || k === undefined || k < 0 || isNaN(k)) return null;
+  return (k / 1e6).toFixed(2) + ' GHz';
+}
+
+/** 把 "/" 分隔的长串（构建指纹）按显示宽度拆行：
+ *  逐段累加，若当前行加上 "/下一段" 会超出可用宽度，则下一段另起一行。
+ *  拆行仅在 "/" 边界发生，段本身不再折断。 */
+function wrapBySlash(value, maxChars) {
+  if (!value) return null;
+  if (value.length <= maxChars) return value;
+  const segs = String(value).split('/');
+  const lines = [];
+  let cur = segs[0];
+  for (let i = 1; i < segs.length; i++) {
+    const next = segs[i];
+    if ((cur + '/' + next).length <= maxChars) {
+      cur = cur + '/' + next;
+    } else {
+      lines.push(cur);
+      cur = next;
+    }
+  }
+  lines.push(cur);
+  return lines.length > 1 ? lines : value;
+}
+
+/** GPU 图形 API 字符串："OpenGL ES 3.2 …(GIT@…)(Date: …)" →
+ *  主版本行 + 每个 "(...)" 段独占一行（去括号）。 */
+function splitGpuVersion(v) {
+  if (!v) return null;
+  const s = String(v);
+  // 取出所有 (…) 段
+  const parts = s.split(/(\([^)]*\))/).filter(p => p.trim() !== '');
+  if (parts.length <= 1) return s.length > 44 ? wrapBySlash(s, 44) : s;
+  const lines = [];
+  for (const p of parts) {
+    const t = p.trim();
+    if (t.startsWith('(') && t.endsWith(')')) {
+      lines.push(t.slice(1, -1).trim());
+    } else if (t) {
+      lines.push(t);
+    }
+  }
+  return lines;
+}
+
+/** WebView 信息 "包名 版本号" → 两行（版本号另起一行）。 */
+function splitWebView(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  const sp = s.lastIndexOf(' ');
+  if (sp <= 0) return s;
+  return [s.slice(0, sp), s.slice(sp + 1)];
+}
+
+/* ============ 数据组 ============ */
+
+function fetchDevice() {
+  if (noBridge()) return null;
+  const d = parseBridge(NativeInfo.getDeviceInfo());
+  if (!d) return null;
+  return [
+    ['厂商', d.manufacturer],
+    ['型号', d.model],
+    ['设备昵称', d.deviceName],
+    ['内部代号', d.device],
+    ['主板平台', d.board],
+  ];
+}
+
+function fetchMemory() {
+  if (noBridge()) return null;
+  const m = parseBridge(NativeInfo.getMemoryInfo());
+  if (!m) return null;
+  const pct = (m.avail / m.total * 100).toFixed(1);
+  return [
+    ['内存总量', fmtBytes(m.total)],
+    ['当前可用', fmtBytes(m.avail) + ' (' + pct + '%)'],
+    ['低内存阈值', fmtBytes(m.threshold)],
+  ];
+}
+
+function fetchFlash() {
+  if (noBridge()) return null;
+  const s = parseBridge(NativeInfo.getStorageInfo());
+  if (!s) return null;
+  const rows = [['闪存类型', s.type || null]];
+  if (s.detail) {
+    // detail 可能是启动设备路径（长）或块设备名（短），长则两行
+    rows.push(['判定依据', wrapBySlash(s.detail, 30)]);
+  }
+  if (s.type === 'UFS') {
+    if (s.desc) rows.push(['描述符', s.desc]);
+    if (s.sub) rows.push(['厂商字符串', s.sub]);
+  } else if (s.type === 'eMMC') {
+    if (s.manufacturer) rows.push(['颗粒厂商', s.manufacturer]);
+    if (s.manid) rows.push(['厂商 ID', s.manid]);
+    if (s.product) rows.push(['产品名', s.product]);
+  }
+  return rows;
+}
+
+function fetchDisplay() {
+  if (noBridge()) return null;
+  const d = parseBridge(NativeInfo.getDisplayInfo());
+  if (!d) return null;
+  return [
+    ['分辨率', d.width + ' × ' + d.height + ' px'],
+    ['像素密度', d.densityDpi + ' dpi (×' + d.density + ')'],
+    ['物理密度', 'xdpi ' + d.xdpi.toFixed(1) + ' / ydpi ' + d.ydpi.toFixed(1)],
+    ['屏幕尺寸', d.inches ? d.inches.toFixed(2) + ' 英寸（估算）' : null],
+    ['刷新率', d.refresh ? d.refresh.toFixed(1) + ' Hz' : null],
+  ];
+}
+
+function fetchStorageStat() {
+  if (noBridge()) return null;
+  const s = parseBridge(NativeInfo.getStorageStat());
+  if (!s) return null;
+  const usedPct = (s.used / s.total * 100).toFixed(1);
+  return [
+    ['总容量', fmtBytes(s.total)],
+    ['可用', fmtBytes(s.avail) + ' (' + (100 - usedPct).toFixed(1) + '%)'],
+    ['已用', fmtBytes(s.used) + ' (' + usedPct + '%)'],
+  ];
+}
+
+function fetchSystem() {
+  if (noBridge()) return null;
+  const s = parseBridge(NativeInfo.getSystemInfo());
+  if (!s) return null;
+  return [
+    ['Android 版本', s.release + (s.codename && s.codename !== 'REL' ? ' (' + s.codename + ')' : '')],
+    ['API 等级', s.sdk],
+    ['安全补丁', s.securityPatch],
+    ['内核版本', s.kernel],
+    ['构建指纹', wrapBySlash(s.fingerprint, 30)],
+    ['构建标签', s.tags],
+    ['构建时间', s.buildTime ? new Date(s.buildTime).toLocaleString() : null],
+    ['已开机', fmtUptime(s.bootUptime)],
+  ];
+}
+
+function fetchCpu() {
+  if (noBridge()) return null;
+  const c = parseBridge(NativeInfo.getCpuInfo());
+  if (!c) return null;
+  const rows = [
+    ['架构', c.arch],
+    ['核心数', c.cores],
+    ['ABI', c.abis],
+  ];
+  if (Array.isArray(c.clusters)) {
+    for (const cl of c.clusters) {
+      const label = 'CPU' + cl.cpus + (cl.core ? ' · ' + cl.core : '');
+      rows.push([label, fmtKHz(cl.maxFreq)]);
+    }
+  }
+  return rows;
+}
+
+function fetchGpu() {
+  if (noBridge()) return null;
+  const g = parseBridge(NativeInfo.getGpuInfo());
+  if (!g) return null;
+  return [
+    ['渲染器', g.renderer],
+    ['图形 API', splitGpuVersion(g.version)],
+  ];
+}
+
+function fetchBattery() {
+  if (noBridge()) return null;
+  const b = parseBridge(NativeInfo.getBatteryInfo());
+  if (!b) return null;
+  const rows = [
+    ['电量', b.level !== undefined ? b.level + '%' : null],
+    ['状态', b.status],
+    ['健康', b.health],
+    ['技术', b.technology],
+  ];
+  if (b.voltage) rows.push(['电压', (b.voltage / 1000).toFixed(2) + ' V']);
+  if (b.temperature) rows.push(['温度', (b.temperature / 10).toFixed(1) + ' °C']);
+  if (b.designCapacity) rows.push(['设计容量', (b.designCapacity / 1000).toFixed(0) + ' mAh']);
+  if (b.fullCapacity) {
+    const soh = b.designCapacity
+      ? '（健康度 ' + (b.fullCapacity / b.designCapacity * 100).toFixed(1) + '%）' : '';
+    rows.push(['满充容量', (b.fullCapacity / 1000).toFixed(0) + ' mAh' + soh]);
+  }
+  return rows;
+}
+
+function fetchMisc() {
+  if (noBridge()) return null;
+  const m = parseBridge(NativeInfo.getMiscInfo());
+  if (!m) return null;
+  const rows = [
+    ['传感器数量', m.sensorCount],
+  ];
+  if (m.accel) rows.push(['加速度计', m.accel]);
+  if (m.gyro) rows.push(['陀螺仪', m.gyro]);
+  if (m.mag) rows.push(['磁力计', m.mag]);
+  if (m.light) rows.push(['光线感应', m.light]);
+  rows.push(['WebView', splitWebView(m.webview)]);
+  rows.push(['语言', m.locale]);
+  rows.push(['时区', m.timezone]);
+  return rows;
+}
+
+/* ============ 启动 ============ */
+
+(function main() {
+  // 返回按钮：无论桥可用与否都要能返回主页
+  document.getElementById('tk-back').addEventListener('click', () => {
+    location.href = 'index.html';
+  });
+  if (noBridge()) {
+    renderGroup('提示', [['说明', '原生桥不可用，请在应用内打开本页面']]);
+    return;
+  }
+  document.getElementById('appver').textContent = 'v' + NativeInfo.getAppVersion();
+  for (const g of GROUPS) {
+    renderGroup(g.title, g.fetch());
+  }
+  document.getElementById('copyAll').addEventListener('click', () => {
+    copyText(buildReportText(), null);
+  });
+})();
+</script>
+</body>
+</html>
