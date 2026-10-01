@@ -155,17 +155,19 @@ final String bytes = text == null ? "" : text;
 final byte[] data = bytes.getBytes("UTF-8");
 final android.content.ContentResolver cr = activity.getContentResolver();
 if (Build.VERSION.SDK_INT >= 29) {
+// JSON 非图片，MediaStore.Images 只收 image/* —— 走 Downloads 表（任意 MIME）。
+// 下载目录是用户找文件的默认心智模型，加载pose 的文件选择器也默认从那里浏览。
 android.content.ContentValues cv = new android.content.ContentValues();
-cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, safe);
-cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "application/json");
-cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/" + dirName);
-final Uri uri = cr.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+cv.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safe);
+cv.put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json");
+cv.put(android.provider.MediaStore.Downloads.RELATIVE_PATH, "Download/" + dirName);
+final Uri uri = cr.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
 if (uri == null) throw new RuntimeException("MediaStore insert null");
 OutputStream os = cr.openOutputStream(uri);
 os.write(data); os.flush(); os.close();
 } else {
 File dir = new File(android.os.Environment
-.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), dirName);
+.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), dirName);
 if (!dir.exists()) dir.mkdirs();
 File out = new File(dir, safe);
 FileOutputStream fos = new FileOutputStream(out);
