@@ -48,8 +48,11 @@
   <button id="btnReset">重置</button>
   <button id="btnShot">截图</button>
   <button id="btnFile">换模型</button>
+  <button id="btnSavePose">保存pose</button>
+  <button id="btnLoadPose">加载pose</button>
   <button id="btnLib">模型库</button>
   <input type="file" id="file" accept="*/*" style="position:fixed;top:-200px;left:-200px;width:2px;height:2px;opacity:0.01;z-index:-1">
+  <input type="file" id="poseFile" accept=".json,application/json,*/*" style="position:fixed;top:-200px;left:-200px;width:2px;height:2px;opacity:0.01;z-index:-1">
 </div>
 <div id="hint">点彩色关节球选中骨骼,拖动圆环旋转;空白处单指转视角、双指缩放、点一下取消选中</div>
 <div id="libMask">
@@ -6594,6 +6597,63 @@
       });
     } catch (e) {}
   }
+
+  /* ===== pose 文件导出/导入（与 localStorage 存档同格式:{骨骼名:[x,y,z,w]}） ===== */
+  function poseToJsonText() {
+    var d = { _model: currentModelKey, _ts: new Date().toISOString() };
+    bones.forEach(function (b) {
+      d[b.name] = [b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w];
+    });
+    return JSON.stringify(d, null, 2);
+  }
+  function applyPoseData(d) {
+    var n = 0;
+    bones.forEach(function (b) {
+      if (d[b.name]) { b.quaternion.set(d[b.name][0], d[b.name][1], d[b.name][2], d[b.name][3]); n++; }
+    });
+    if (n) { scheduleSave(); syncSliders(); elHint.textContent = '已加载 pose（' + n + ' 根骨骼）'; }
+    else elHint.textContent = 'pose 文件里没有匹配的骨骼名';
+    return n;
+  }
+  document.getElementById('btnSavePose').addEventListener('click', function () {
+    if (!bones.length) { elHint.textContent = '先加载一个模型'; return; }
+    var text = poseToJsonText();
+    if (window.Android && window.Android.saveTextFile) {
+      window.Android.saveTextFile('pose_' + currentModelKey + '_' + Date.now() + '.json', text);
+    } else {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      a.download = 'pose_' + currentModelKey + '_' + Date.now() + '.json';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      elHint.textContent = '已导出 pose JSON';
+    }
+  });
+  document.getElementById('btnLoadPose').addEventListener('click', function () {
+    if (!bones.length) { elHint.textContent = '先加载一个模型'; return; }
+    poseFileInput.value = '';
+    poseFileInput.click();
+  });
+  var poseFileInput = document.getElementById('poseFile');
+  poseFileInput.addEventListener('change', function () {
+    var f = poseFileInput.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var d = JSON.parse(reader.result);
+        if (d && d._model && d._model !== currentModelKey) {
+          elHint.textContent = '注意:该 pose 来自其他模型(' + d._model + '),骨骼名不同可能不匹配';
+          setTimeout(function () { applyPoseData(d); }, 1500);
+        } else {
+          applyPoseData(d);
+        }
+      } catch (e) {
+        elHint.textContent = 'pose 文件解析失败: ' + (e && e.message ? e.message : e);
+      }
+    };
+    reader.readAsText(f);
+  });
 
   /* ===== 模型库:选过的模型自动存进浏览器,下次一键加载 ===== */
   function abToB64(buf) {

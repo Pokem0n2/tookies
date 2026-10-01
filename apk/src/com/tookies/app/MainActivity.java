@@ -145,6 +145,37 @@ activity.runOnUiThread(new ToastRunner(activity, "已保存截图 poser_" + ts +
 activity.runOnUiThread(new ToastRunner(activity, "截图保存失败: " + e.getMessage()));
 }
 }
+/** GLB 预览 pose JSON 导出：与 saveImage 同路径规则（Pictures/Tookies 目录）。 */
+@JavascriptInterface
+public void saveTextFile(final String filename, final String text) {
+try {
+final String dirName = "Tookies";
+final String safe = (filename == null || filename.length() == 0) ? "pose.json" : filename;
+final String bytes = text == null ? "" : text;
+final byte[] data = bytes.getBytes("UTF-8");
+final android.content.ContentResolver cr = activity.getContentResolver();
+if (Build.VERSION.SDK_INT >= 29) {
+android.content.ContentValues cv = new android.content.ContentValues();
+cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, safe);
+cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "application/json");
+cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/" + dirName);
+final Uri uri = cr.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+if (uri == null) throw new RuntimeException("MediaStore insert null");
+OutputStream os = cr.openOutputStream(uri);
+os.write(data); os.flush(); os.close();
+} else {
+File dir = new File(android.os.Environment
+.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), dirName);
+if (!dir.exists()) dir.mkdirs();
+File out = new File(dir, safe);
+FileOutputStream fos = new FileOutputStream(out);
+fos.write(data); fos.flush(); fos.close();
+}
+activity.runOnUiThread(new ToastRunner(activity, "已保存 " + safe));
+} catch (final Exception e) {
+activity.runOnUiThread(new ToastRunner(activity, "保存失败: " + e.getMessage()));
+}
+}
 }
 /** 系统信息桥（移植自 asi-z android-sys-info v0.8.0 DeviceBridge）：
  *  每方法返回 JSON 字符串，键缺失时 JS 侧显示「不可用」。
