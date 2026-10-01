@@ -814,7 +814,21 @@ public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams 
 if (activity.mFileCallback != null) { activity.mFileCallback.onReceiveValue(null); }
 activity.mFileCallback = cb;
 try {
-activity.startActivityForResult(params.createIntent(), FILE_REQ);
+Intent intent = params.createIntent();
+// pose 选择器（accept 含 json）初始定位到保存目录 Download/Tookies，
+// 否则 DocumentsUI 记住的是上次任意浏览位置（如 netease/cloudmusic）。
+// EXTRA_INITIAL_URI 需 API 26+；目录不存在时 DocumentsUI 自动回退默认位置。
+StringBuilder accept = new StringBuilder();
+String[] types = params.getAcceptTypes();
+if (types != null) { for (String t : types) accept.append(t).append(','); }
+if (accept.indexOf("json") >= 0 && Build.VERSION.SDK_INT >= 26) {
+try {
+android.net.Uri dir = android.provider.DocumentsContract.buildDocumentUri(
+"com.android.externalstorage.documents", "primary:Download/Tookies");
+intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, dir);
+} catch (Exception ignore) { /* 定位失败不影响选择功能 */ }
+}
+activity.startActivityForResult(intent, FILE_REQ);
 return true;
 } catch (Exception e) {
 activity.mFileCallback = null;
