@@ -6,9 +6,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
+import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.provider.Settings;
@@ -16,18 +18,22 @@ import android.util.DisplayMetrics;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.ValueCallback;
 import android.widget.Toast;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.OutputStream;
+import org.json.JSONArray;
+import org.json.JSONObject;
 public class MainActivity extends Activity {
+private static final int FILE_REQ = 51001;
+private ValueCallback mFileCallback;
 private WebView webView;
 @Override
 protected void onCreate(Bundle savedInstanceState) {
@@ -48,9 +54,39 @@ ws.setTextZoom(100);
 webView.addJavascriptInterface(new Bridge(this), "Android");
 webView.addJavascriptInterface(new SysInfoBridge(this), "NativeInfo");
 webView.setWebViewClient(new WebViewClient());
-webView.setWebChromeClient(new WebChromeClient());
+// 文件选择器（GLB 预览"换模型"用）：API 21+ 未重写此方法时 <input type=file> 在 WebView 中无响应。
+// 注：ValueCallback 用 raw type（同 BackHandler），规避 d8 8.2.2 泛型 Signature NPE。
+webView.setWebChromeClient(new WebChromeClient() {
+@Override
+public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams params) {
+if (mFileCallback != null) { mFileCallback.onReceiveValue(null); mFileCallback = null; }
+mFileCallback = cb;
+try {
+startActivityForResult(params.createIntent(), FILE_REQ);
+return true;
+} catch (Exception e) {
+mFileCallback = null;
+return false;
+}
+}
+});
 webView.loadUrl("file:///android_asset/index.html");
 setContentView(webView);
+}
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+if (requestCode == FILE_REQ) {
+Uri[] uris = null;
+if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+uris = new Uri[]{ data.getData() };
+}
+if (mFileCallback != null) {
+mFileCallback.onReceiveValue(uris);
+mFileCallback = null;
+}
+return;
+}
+super.onActivityResult(requestCode, resultCode, data);
 }
 @Override
 public void onBackPressed() {
@@ -87,6 +123,41 @@ activity.startActivity(Intent.createChooser(send, "分享 xCalc 数据"));
 @JavascriptInterface
 public void toast(final String msg) {
 activity.runOnUiThread(new ToastRunner(activity, msg));
+}
+/** GLB 预览截图保存：WebView 内 <a download> 无效，原生侧落盘到相册（Pictures/Tookies）。
+ *  API 29+ 用 MediaStore 无需存储权限；API 21-28 写公共 Pictures 也免权限（legacy external storage）。 */
+@JavascriptInterface
+public void saveImage(final String dataUrl) {
+try {
+final String b64;
+if (dataUrl != null && dataUrl.startsWith("data:image/png;base64,")) {
+b64 = dataUrl.substring("data:image/png;base64,".length());
+} else { b64 = dataUrl; }
+final byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+final android.content.ContentResolver cr = activity.getContentResolver();
+final String ts = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US)
+.format(new java.util.Date());
+if (Build.VERSION.SDK_INT >= 29) {
+android.content.ContentValues cv = new android.content.ContentValues();
+cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "poser_" + ts + ".png");
+cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png");
+cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Tookies");
+final Uri uri = cr.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+if (uri == null) throw new RuntimeException("MediaStore insert null");
+OutputStream os = cr.openOutputStream(uri);
+os.write(bytes); os.flush(); os.close();
+} else {
+File dir = new File(android.os.Environment
+.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES), "Tookies");
+if (!dir.exists()) dir.mkdirs();
+File out = new File(dir, "poser_" + ts + ".png");
+FileOutputStream fos = new FileOutputStream(out);
+fos.write(bytes); fos.flush(); fos.close();
+}
+activity.runOnUiThread(new ToastRunner(activity, "已保存截图 poser_" + ts + ".png"));
+} catch (final Exception e) {
+activity.runOnUiThread(new ToastRunner(activity, "截图保存失败: " + e.getMessage()));
+}
 }
 }
 /** 系统信息桥（移植自 asi-z android-sys-info v0.8.0 DeviceBridge）：
