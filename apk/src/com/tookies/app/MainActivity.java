@@ -55,21 +55,8 @@ webView.addJavascriptInterface(new Bridge(this), "Android");
 webView.addJavascriptInterface(new SysInfoBridge(this), "NativeInfo");
 webView.setWebViewClient(new WebViewClient());
 // 文件选择器（GLB 预览"换模型"用）：API 21+ 未重写此方法时 <input type=file> 在 WebView 中无响应。
-// 注：ValueCallback 用 raw type（同 BackHandler），规避 d8 8.2.2 泛型 Signature NPE。
-webView.setWebChromeClient(new WebChromeClient() {
-@Override
-public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams params) {
-if (mFileCallback != null) { mFileCallback.onReceiveValue(null); mFileCallback = null; }
-mFileCallback = cb;
-try {
-startActivityForResult(params.createIntent(), FILE_REQ);
-return true;
-} catch (Exception e) {
-mFileCallback = null;
-return false;
-}
-}
-});
+// 注：static 嵌套类 + raw ValueCallback（同 BackHandler），规避 d8 8.2.2 泛型 Signature/匿名类 NPE。
+webView.setWebChromeClient(new FileChooserClient(this));
 webView.loadUrl("file:///android_asset/index.html");
 setContentView(webView);
 }
@@ -97,8 +84,7 @@ final String req = "window.__tydligBack ? window.__tydligBack() : false";
 webView.evaluateJavascript(req, new BackHandler(webView));
 }
 /** 返回键回调：页面未处理时 WebView 后退（回到主页）。 */
-static class BackHandler implements ValueCallback {
-private final WebView webView;
+static class BackHandler implements ValueCallback {private final WebView webView;
 BackHandler(WebView webView) { this.webView = webView; }
 @Override
 public void onReceiveValue(Object result) {
@@ -784,6 +770,23 @@ ToastRunner(Activity activity, String msg) { this.activity = activity; this.msg 
 @Override
 public void run() {
 Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
+}
+}
+/** 文件选择器（GLB 换模型）：static 嵌套类，结果经 onActivityResult 回传 WebView。 */
+static class FileChooserClient extends WebChromeClient {
+private final MainActivity activity;
+FileChooserClient(MainActivity activity) { this.activity = activity; }
+@Override
+public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams params) {
+if (activity.mFileCallback != null) { activity.mFileCallback.onReceiveValue(null); }
+activity.mFileCallback = cb;
+try {
+activity.startActivityForResult(params.createIntent(), FILE_REQ);
+return true;
+} catch (Exception e) {
+activity.mFileCallback = null;
+return false;
+}
 }
 }
 }
