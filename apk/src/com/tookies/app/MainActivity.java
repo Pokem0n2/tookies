@@ -54,7 +54,7 @@ ws.setTextZoom(100);
 webView.addJavascriptInterface(new Bridge(this), "Android");
 webView.addJavascriptInterface(new SysInfoBridge(this), "NativeInfo");
 webView.setWebViewClient(new WebViewClient());
-// 文件选择器（GLB 预览"换模型"用）：API 21+ 未重写此方法时 <input type=file> 在 WebView 中无响应。
+// 文件选择器（GLB 预览"添加模型"用）：API 21+ 未重写此方法时 <input type=file> 在 WebView 中无响应。
 // 注：static 嵌套类 + raw ValueCallback（同 BackHandler），规避 d8 8.2.2 泛型 Signature/匿名类 NPE。
 webView.setWebChromeClient(new FileChooserClient(this));
 webView.loadUrl("file:///android_asset/index.html");
@@ -156,7 +156,7 @@ final byte[] data = bytes.getBytes("UTF-8");
 final android.content.ContentResolver cr = activity.getContentResolver();
 if (Build.VERSION.SDK_INT >= 29) {
 // JSON 非图片，MediaStore.Images 只收 image/* —— 走 Downloads 表（任意 MIME）。
-// 下载目录是用户找文件的默认心智模型，加载pose 的文件选择器也默认从那里浏览。
+// 下载目录是用户找文件的默认心智模型，载入pose 的文件选择器也默认从那里浏览。
 android.content.ContentValues cv = new android.content.ContentValues();
 cv.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, safe);
 cv.put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json");
@@ -805,7 +805,7 @@ public void run() {
 Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show();
 }
 }
-/** 文件选择器（GLB 换模型）：static 嵌套类，结果经 onActivityResult 回传 WebView。 */
+/** 文件选择器（GLB 添加模型）：static 嵌套类，结果经 onActivityResult 回传 WebView。 */
 static class FileChooserClient extends WebChromeClient {
 private final MainActivity activity;
 FileChooserClient(MainActivity activity) { this.activity = activity; }
