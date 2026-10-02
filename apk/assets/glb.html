@@ -44,6 +44,7 @@
 <div id="topbar">
   <button id="tk-back" aria-label="返回 Tookies" style="flex:0 0 auto;min-width:40px;padding:10px 4px;background:transparent;color:#e8e8ea;font-size:18px;">‹</button>
   <button id="btnPose" class="on">摆姿势</button>
+  <button id="btnMove">移动</button>
   <button id="btnView">看整体</button>
   <button id="btnReset">重置</button>
   <button id="btnShot">截图</button>
@@ -6522,20 +6523,27 @@
   function setMode(m) {
     mode = m;
     var pose = (m === 'pose');
+    var move = (m === 'move');
     boneSpheres.forEach(function (s) { s.visible = pose; });
-    tc.visible = pose;
-    if (!pose) tc.detach();
-    else if (selected) tc.attach(selected);
+    tc.setMode(move ? 'translate' : 'rotate');
+    tc.visible = pose || move;
+    if (!pose && !move) tc.detach();
+    else if (move) { tc.setSpace('world'); if (model) tc.attach(model); }
+    else { tc.setSpace('local'); if (selected) tc.attach(selected); }
     document.getElementById('btnPose').className = pose ? 'on' : '';
-    document.getElementById('btnView').className = pose ? '' : 'on';
+    document.getElementById('btnMove').className = move ? 'on' : '';
+    document.getElementById('btnView').className = (pose || move) ? '' : 'on';
     document.getElementById('panel').style.display = pose ? 'flex' : 'none';
+    if (move) elHint.textContent = '拖箭头移动整个模型;再点「摆姿势」回到骨骼编辑';
   }
 
   document.getElementById('btnPose').addEventListener('click', function () { setMode('pose'); });
+  document.getElementById('btnMove').addEventListener('click', function () { setMode('move'); });
   document.getElementById('btnView').addEventListener('click', function () { setMode('view'); });
 
   document.getElementById('btnReset').addEventListener('click', function () {
     bones.forEach(function (b) { b.quaternion.copy(restQuat[b.name]); });
+    if (model) model.position.set(0, 0, 0);
     try { localStorage.removeItem(poseKey()); } catch (e) {}
     syncSliders();
     elHint.textContent = '已恢复默认姿势';
@@ -6582,6 +6590,7 @@
     bones.forEach(function (b) {
       d[b.name] = [b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w];
     });
+    if (model) d._pos = [model.position.x, model.position.y, model.position.z];
     try { localStorage.setItem(poseKey(), JSON.stringify(d)); } catch (e) {}
   }
   function restorePose() {
@@ -6592,6 +6601,7 @@
       }
       if (!raw) return;
       var d = JSON.parse(raw);
+      if (d._pos && model) model.position.set(d._pos[0], d._pos[1], d._pos[2]);
       bones.forEach(function (b) {
         if (d[b.name]) b.quaternion.set(d[b.name][0], d[b.name][1], d[b.name][2], d[b.name][3]);
       });
@@ -6604,10 +6614,12 @@
     bones.forEach(function (b) {
       d[b.name] = [b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w];
     });
+    if (model) d._pos = [model.position.x, model.position.y, model.position.z];
     return JSON.stringify(d, null, 2);
   }
   function applyPoseData(d) {
     var n = 0;
+    if (d._pos && model) model.position.set(d._pos[0], d._pos[1], d._pos[2]);
     bones.forEach(function (b) {
       if (d[b.name]) { b.quaternion.set(d[b.name][0], d[b.name][1], d[b.name][2], d[b.name][3]); n++; }
     });
