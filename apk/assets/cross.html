@@ -865,6 +865,11 @@ function updAux(){
   const $a=$('aux');if(!$a)return;
   if(!grid.length||!grid[0]||!grid[0].length)return;      // grid not primed yet
   if(!$g.children.length)return;                           // cells not rendered yet
+  /* v2.1.3: helper digits scale with cell size again (looks better); the board
+     width shrinks per-N so the scaled digits still fit inside the screen. */
+  const vw=Math.min(document.documentElement.clientWidth,window.innerWidth||1e9);
+  const shrink={4:0.68,6:0.78,8:0.82,10:0.84}[N]||0.84;
+  $('gwrap').style.width=`min(${Math.round(shrink*100)}vw,360px)`;
   const {cols,rows}=auxNumbers();
   const disp=v=>v===null?'':(v===-1?'0':String(v+1));   // raw v → displayed digit
   const sumd=v=>v===null?0:(v===-1?0:v+1);              // summand: empty-line min counts 0
@@ -886,35 +891,38 @@ function updAux(){
       bottom:gy+el.offsetTop+el.offsetHeight
     }:null);
   }
+  // v2.1.2: helper digits use HELL (10x10) sizing on ALL difficulties — fixed
+  // font + font-based outward gap, so big-cell boards (4x4/6x6/8x8) no longer
+  // push digits off-screen (cell-proportional offsets could exceed the margin).
+  // v2.1.3: digits scale with cell size; outward gap scales with the font
+  const AUX_FS=Math.max(14,Math.round(cells[0].height*0.45));
+  const AUX_GAP=Math.max(10,Math.round(AUX_FS*1.1));
   // top helper row: column minima aligned above each column
   for(let c=0;c<N;c++){
     const cr=cells[c];
     const cx=cr.left-ar.left+cr.width/2;
-    const cy=cr.top-ar.top-cr.height/2;
-    const fs=Math.max(9,Math.round(cr.height*0.45));
-    html+=`<div class="hslot cmin" style="left:${cx}px;top:${cy}px;font-size:${fs}px">${disp(cols[c])}</div>`;
+    const cy=cells[0].top-ar.top-AUX_GAP;
+    html+=`<div class="hslot cmin" style="left:${cx}px;top:${cy}px;font-size:${AUX_FS}px">${disp(cols[c])}</div>`;
   }
-  const fs2=Math.max(9,Math.round(cells[N-1].height*0.45));
   // red sum: same row as the black digits, far right — the slot above the topmost white digit
   const sSum=cols.reduce((s,v)=>s+sumd(v),0);
   const topRight=cells[N-1];
-  const sX=topRight.right-ar.left+Math.max(10,cr0W(topRight)*0.5);
-  const sY=topRight.top-ar.top-topRight.height/2;
-  html+=`<div class="hslot sum-s" style="left:${sX}px;top:${sY}px;font-size:${fs2}px">${sSum}</div>`;
+  const sX=topRight.right-ar.left+AUX_GAP;
+  const sY=cells[0].top-ar.top-AUX_GAP;
+  html+=`<div class="hslot sum-s" style="left:${sX}px;top:${sY}px;font-size:${AUX_FS}px">${sSum}</div>`;
   // right helper col: row minima aligned right of each row
   for(let r=0;r<N;r++){
     const cr=cells[r*N+(N-1)];
-    const cx=cr.right-ar.left+Math.max(10,cr0W(cr)*0.5);
+    const cx=cr.right-ar.left+AUX_GAP;
     const cy=cr.top-ar.top+cr.height/2;
-    const fs=Math.max(9,Math.round(cr.height*0.45));
-    html+=`<div class="hslot rmin" style="left:${cx}px;top:${cy}px;font-size:${fs}px">${disp(rows[r])}</div>`;
+    html+=`<div class="hslot rmin" style="left:${cx}px;top:${cy}px;font-size:${AUX_FS}px">${disp(rows[r])}</div>`;
   }
   // green sum: same column as the white digits, very bottom — the slot below the last white digit
   const wSum=rows.reduce((s,v)=>s+sumd(v),0);
   const lastRow=cells[N*N-1];
-  const wX=lastRow.right-ar.left+Math.max(10,cr0W(lastRow)*0.5);
-  const wY=lastRow.bottom-ar.top+lastRow.height/2;
-  html+=`<div class="hslot sum-w" style="left:${wX}px;top:${wY}px;font-size:${fs2}px">${wSum}</div>`;
+  const wX=lastRow.right-ar.left+AUX_GAP;
+  const wY=lastRow.bottom-ar.top+AUX_GAP;
+  html+=`<div class="hslot sum-w" style="left:${wX}px;top:${wY}px;font-size:${AUX_FS}px">${wSum}</div>`;
   // v2.0.70-hl: yellow glow outline on cells where colMin + rowMin − self > 1.
   // Helper values use DISPLAY digits (gray=1 … black=9; line-with-empty reads 0);
   // self digit is the cell's own display value; removed cells (v<0) are skipped.
@@ -1811,17 +1819,25 @@ function init(){
     const ok=()=>{const btn=$('bCopySeed');const old=btn.textContent;btn.style.minWidth=btn.offsetWidth+'px';btn.textContent=t('copied');setTimeout(()=>{btn.textContent=old;btn.style.minWidth='';},1200);};
     if(navigator.clipboard&&navigator.clipboard.writeText){
       navigator.clipboard.writeText(txt).then(ok).catch(()=>fallbackCopy(txt,ok));
-    }else fallbackCopy(txt,ok);
+    }else{
+      fallbackCopy(txt,ok);
+    }
+    function fallbackCopy(s,after){
+      try{
+        const ta=document.createElement('textarea');
+        ta.value=s;ta.style.cssText='position:fixed;left:-9999px;top:0';
+        document.body.appendChild(ta);ta.focus();ta.select();
+        const done=document.execCommand('copy');
+        ta.remove();
+        if(done&&after)after();
+        else if(window.Android&&Android.toast)Android.toast('Seed: '+s);
+        else prompt('Seed:',s);
+      }catch(e){
+        if(window.Android&&Android.toast)Android.toast('Seed: '+s);
+        else prompt('Seed:',s);
+      }
+    }
   });
-  function fallbackCopy(txt,ok){
-    // WebView file:// 无剪贴板权限：优先 Android 桥 toast 显示 seed，退路 execCommand
-    if(window.Android&&Android.toast){Android.toast('seed: '+txt);ok();return;}
-    try{
-      const ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;top:-999px;left:-999px;opacity:0';
-      document.body.appendChild(ta);ta.focus();ta.select();const done=document.execCommand('copy');ta.remove();
-      if(done)ok();else if(window.Android&&Android.toast)Android.toast('复制失败，seed: '+txt);
-    }catch(e){if(window.Android&&Android.toast)Android.toast('复制失败，seed: '+txt);}
-  }
   $('bLoadSeed').addEventListener('click',()=>{
     const ov=$('seedOv');ov.classList.remove('hide');
     $('seedIn').value='';
