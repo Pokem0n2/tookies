@@ -21,12 +21,17 @@ html,body{margin:0;padding:0;height:100%;width:100%;background:#fff;color:#222;f
 .home-header{padding:24px 16px 8px;font-size:22px;font-weight:700}
 .home-sub{padding:0 16px 16px;font-size:13px;color:#888}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 12px 24px}
-/* 横屏：3 列会使卡片拉宽、图标周边大留白 → 改 4 列紧凑排列 */
-@media (orientation:landscape){.grid{grid-template-columns:repeat(4,1fr)}}
 .tile{background:#fff;border-radius:14px;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:transform .08s}
 .tile:active{transform:scale(.96);background:#f7f7f7}
 .tile-icon svg{width:34px;height:34px;stroke:#222;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .tile-label{font-size:12px;color:#444;font-weight:500}
+/* 横屏：3 列会使卡片拉宽、图标周边大留白 → 横屏一行排满 7 个；卡片变窄同步缩小图标/文字 */
+@media (orientation:landscape){
+  .grid{grid-template-columns:repeat(7,1fr)}
+  .tile-icon svg{width:24px;height:24px}
+  .tile-label{font-size:10px}
+  .tile{gap:4px;border-radius:10px}
+}
 .paint-toolbar{height:50px;display:flex;align-items:center;padding:0 6px;gap:5px;background:#fff;border-top:1px solid #eee;flex-shrink:0}
 .color-btn{width:34px;height:34px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px #ccc;cursor:pointer;flex-shrink:0;padding:0;outline:none;transition:box-shadow .15s}
 .color-btn:active{box-shadow:0 0 0 1.5px #222}

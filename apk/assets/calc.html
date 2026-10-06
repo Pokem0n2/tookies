@@ -100,6 +100,8 @@
     #keypad .grid { flex: 0 0 auto; }
     #keypad .key { height: 44px; font-size: 20px; }
     #keypad .drawer { justify-content: center; padding: 0 0 6px; }
+    /* 顶栏功能按钮（更多/撤销/重做）不能被键盘列遮挡：横屏时收窄至画布区 */
+    #topbar { right: 300px; border-bottom: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
   #keypad .drawer {
     display: flex; align-items: center; justify-content: flex-end;
@@ -495,11 +497,45 @@ const ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1;
 const cam = { cx: 0, cy: 0, s: 0.35 };       // 默认缩到最小；screen = (world - c) * s + viewport/2
 
+/* 画布可视带（避开顶栏与键盘）：横屏=右侧键盘列左侧区域；竖屏=顶栏下、键盘上 */
+function keypadRect() {
+  const r = document.getElementById('keypad').getBoundingClientRect();
+  const side = r.height > H * 0.6 && r.width < W * 0.5; /* 高占大半屏且窄 → 右侧列 */
+  return { side, w: r.width, h: r.height };
+}
+function topbarH() {
+  const r = document.getElementById('topbar').getBoundingClientRect();
+  return r.height;
+}
+function bandRect() {
+  const k = keypadRect(), t = topbarH();
+  return {
+    x0: 0,
+    x1: k.side ? W - k.w : W,
+    y0: Math.min(t, H * 0.25),
+    y1: k.side ? H : H - k.h
+  };
+}
+/* 上次可视带中心（世界坐标）——旋转屏幕时保持该点仍在可视带中心 */
+let prevBandCenterWorld = null;
 function resize() {
   DPR = Math.min(window.devicePixelRatio || 1, 3);
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const b = bandRect();
+  if (prevBandCenterWorld && b.x1 > b.x0 && b.y1 > b.y0) {
+    const bcx = (b.x0 + b.x1) / 2, bcy = (b.y0 + b.y1) / 2;
+    cam.cx = prevBandCenterWorld.x - (bcx - W / 2) / cam.s;
+    cam.cy = prevBandCenterWorld.y - (bcy - H / 2) / cam.s;
+  }
+  prevBandCenterWorld = bandCenterWorld();
+  scheduleSave();
+}
+function bandCenterWorld() {
+  const b = bandRect();
+  const bcx = (b.x0 + b.x1) / 2, bcy = (b.y0 + b.y1) / 2;
+  return { x: (bcx - W / 2) / cam.s + cam.cx, y: (bcy - H / 2) / cam.s + cam.cy };
 }
 window.addEventListener('resize', resize);
 
@@ -596,13 +632,17 @@ function fitView() {
     x0 = Math.min(x0, b.x - b.w / 2); x1 = Math.max(x1, b.x + b.w / 2);
     y0 = Math.min(y0, b.y - b.h / 2); y1 = Math.max(y1, b.y + b.h / 2);
   }
-  const pad = 40, top = 120, bottom = 330;      // 顶栏与键盘（含 fx 展开余量）
-  const availW = W - pad * 2;
-  const availH = Math.max(200, H - top - bottom);
+  const pad = 40, fxMargin = 70; /* fx 展开余量：竖屏键盘增高；横屏键盘内部滚动不影响画布 */
+  const b = bandRect();
+  const k = keypadRect();
+  const availW = (b.x1 - b.x0) - pad * 2;
+  const availH = Math.max(200, (b.y1 - b.y0) - pad * 2 - (k.side ? 0 : fxMargin));
   cam.s = clampS(Math.min(availW / Math.max(x1 - x0, 1), availH / Math.max(y1 - y0, 1), 1.6));
-  cam.cx = (x0 + x1) / 2;
-  // 内容中心落在 [top, H-bottom] 可视带的中点
-  cam.cy = (y0 + y1) / 2 + (bottom - top) / (2 * cam.s);
+  // 内容 bbox 中心落在可视带中心（对 toScreen 公式反解）
+  const bcx = (b.x0 + b.x1) / 2, bcy = (b.y0 + b.y1) / 2;
+  cam.cx = (x0 + x1) / 2 + (W / 2 - bcx) / cam.s;
+  cam.cy = (y0 + y1) / 2 + (H / 2 - bcy) / cam.s;
+  prevBandCenterWorld = bandCenterWorld();
   scheduleSave();
 }
 
