@@ -5,7 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -53,12 +57,29 @@ ws.setMediaPlaybackRequiresUserGesture(false);
 ws.setTextZoom(100);
 webView.addJavascriptInterface(new Bridge(this), "Android");
 webView.addJavascriptInterface(new SysInfoBridge(this), "NativeInfo");
+// 传感器模块（sensors.html）：枚举+监听桥，移植自 op13t-sensors v0.2.2。
+// static 嵌套类 + raw type（d8 8.2.2 限制：无匿名类、无泛型）。
+sensorsBridge = new SensorsBridge(this, webView);
+webView.addJavascriptInterface(sensorsBridge, "Sensors");
 webView.setWebViewClient(new WebViewClient());
 // 文件选择器（GLB 预览"添加模型"用）：API 21+ 未重写此方法时 <input type=file> 在 WebView 中无响应。
 // 注：static 嵌套类 + raw ValueCallback（同 BackHandler），规避 d8 8.2.2 泛型 Signature/匿名类 NPE。
 webView.setWebChromeClient(new FileChooserClient(this));
 webView.loadUrl("file:///android_asset/index.html");
 setContentView(webView);
+}
+private SensorsBridge sensorsBridge;
+@Override
+protected void onPause() {
+// 传感器后台停流（省电）：注销全部监听；onResume 由页面 __resume() 按状态重挂
+if (sensorsBridge != null) sensorsBridge.stopAll();
+super.onPause();
+}
+@Override
+protected void onResume() {
+super.onResume();
+// 页面按自身 UI 状态重新注册监听
+if (webView != null) webView.evaluateJavascript("window.__resume && window.__resume()", null);
 }
 @Override
 protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -834,6 +855,159 @@ return true;
 activity.mFileCallback = null;
 return false;
 }
+}
+}
+
+/** 传感器模块桥（sensors.html 用）：移植自 op13t-sensors v0.2.2 Bridge+Pusher。
+ *  原生侧两件事：枚举全部传感器吐规格 JSON（getSensors）；批量注册监听，
+ *  最新值以 200ms 节流推给页面（window.__push）。
+ *  d8 8.2.2 限制：static 嵌套类、无匿名类、集合 raw type。 */
+static class SensorsBridge implements SensorEventListener {
+final Activity act;
+final WebView web;
+final SensorManager sm;
+final java.util.List all;
+final boolean[] active;
+final float[][] vals;
+final long[] ts;
+final int[] acc;
+final boolean[] dirty;
+final Handler main = new Handler(Looper.getMainLooper());
+final SensorsPusher pusher;
+boolean pushRunning = false;
+SensorsBridge(Activity act, WebView web) {
+this.act = act;
+this.web = web;
+this.sm = (SensorManager) act.getSystemService(Context.SENSOR_SERVICE);
+this.all = sm.getSensorList(Sensor.TYPE_ALL);
+int n = all.size();
+active = new boolean[n];
+vals = new float[n][];
+ts = new long[n];
+acc = new int[n];
+dirty = new boolean[n];
+pusher = new SensorsPusher(this);
+}
+@JavascriptInterface
+public String getSensors() {
+JSONArray a = new JSONArray();
+for (int i = 0; i < all.size(); i++) {
+Sensor s = (Sensor) all.get(i);
+JSONObject o = new JSONObject();
+try {
+o.put("i", i);
+o.put("name", s.getName());
+o.put("vendor", s.getVendor());
+o.put("ver", s.getVersion());
+o.put("type", s.getType());
+o.put("stype", s.getStringType());
+o.put("pw", s.getPower());
+o.put("res", s.getResolution());
+o.put("rng", s.getMaximumRange());
+o.put("mind", s.getMinDelay());
+o.put("maxd", s.getMaxDelay());
+o.put("fifo", s.getFifoMaxEventCount());
+o.put("rm", s.getReportingMode());
+o.put("wk", s.isWakeUpSensor());
+a.put(o);
+} catch (Exception ignored) { }
+}
+return a.toString();
+}
+@JavascriptInterface
+public String listen(int idx) {
+if (idx < 0 || idx >= all.size()) return "索引越界";
+Sensor s = (Sensor) all.get(idx);
+try {
+boolean ok = sm.registerListener(this, s, SensorManager.SENSOR_DELAY_UI);
+if (ok) {
+active[idx] = true;
+startPush();
+return "ok";
+}
+return "注册被拒绝";
+} catch (Exception e) {
+String m = e.getMessage();
+return e.getClass().getSimpleName() + (m == null ? "" : ": " + m);
+}
+}
+@JavascriptInterface
+public void stop(int idx) {
+if (idx < 0 || idx >= all.size()) return;
+sm.unregisterListener(this, (Sensor) all.get(idx));
+active[idx] = false;
+dirty[idx] = false;
+vals[idx] = null;
+}
+@JavascriptInterface
+public void stopAll() {
+sm.unregisterListener(this);
+for (int i = 0; i < active.length; i++) {
+active[i] = false;
+dirty[i] = false;
+vals[i] = null;
+}
+}
+public void onSensorChanged(SensorEvent e) {
+int idx = indexOf(e.sensor);
+if (idx < 0) return;
+vals[idx] = java.util.Arrays.copyOf(e.values, e.values.length);
+ts[idx] = e.timestamp;
+acc[idx] = e.accuracy;
+dirty[idx] = true;
+if (e.sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT) {
+sm.unregisterListener(this, e.sensor);
+sm.registerListener(this, e.sensor, SensorManager.SENSOR_DELAY_UI);
+}
+}
+public void onAccuracyChanged(Sensor s, int accuracy) { }
+private int indexOf(Sensor s) {
+for (int i = 0; i < all.size(); i++) {
+if (all.get(i).equals(s)) return i;
+}
+return -1;
+}
+void startPush() {
+if (!pushRunning) {
+pushRunning = true;
+main.postDelayed(pusher, 200);
+}
+}
+void flush() {
+JSONObject o = new JSONObject();
+boolean any = false;
+for (int i = 0; i < all.size(); i++) {
+if (!dirty[i] || vals[i] == null) { dirty[i] = false; continue; }
+JSONObject d = new JSONObject();
+try {
+JSONArray v = new JSONArray();
+for (int k = 0; k < vals[i].length; k++) v.put((double) vals[i][k]);
+d.put("t", ts[i]);
+d.put("a", acc[i]);
+d.put("v", v);
+o.put(String.valueOf(i), d);
+any = true;
+} catch (Exception ignored) { }
+dirty[i] = false;
+}
+if (!any) return;
+web.evaluateJavascript(
+"window.__push && window.__push(" + o.toString() + ")", null);
+}
+}
+
+/** 周期推送器（不能匿名类，单独 static）。 */
+static class SensorsPusher implements Runnable {
+final SensorsBridge b;
+SensorsPusher(SensorsBridge b) { this.b = b; }
+public void run() {
+try { b.flush(); } catch (Exception ignored) { }
+boolean any = false;
+for (int i = 0; i < b.active.length; i++) {
+if (b.active[i]) { any = true; break; }
+}
+if (any) b.main.postDelayed(this, 200);
+else b.pushRunning = false;
 }
 }
 }

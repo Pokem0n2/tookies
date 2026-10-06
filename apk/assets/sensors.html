@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>传感器 — Tookies</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1c1d1f; --sub:#8a8f99;
+    --line:#e8eaee; --acc:#2f6fed; --ok:#0f9d58; --warn:#e8a300;
+    --mono:ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--ink);
+       font:15px/1.5 -apple-system,"HarmonyOS Sans SC","PingFang SC","Noto Sans CJK SC",sans-serif;
+       padding-bottom:40px}
+  header{position:sticky;top:0;z-index:9;background:rgba(244,245,247,.94);
+         backdrop-filter:blur(8px);padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+  header h1{font-size:19px;font-weight:600}
+  header .sub{font-size:12px;color:var(--sub);margin-top:2px}
+  .toolbar{display:flex;gap:8px;margin-top:10px}
+  .toolbar button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);
+                  border-radius:10px;padding:8px 0;font-size:13px;font-weight:500}
+  /* ---- 传感器卡片 ---- */
+  #list{padding:10px 12px}
+  .sen{background:var(--card);border:1px solid var(--line);border-radius:12px;
+       margin-bottom:8px;overflow:hidden}
+  .row{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer}
+  .dotbox{flex:none;width:30px;align-self:stretch;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .dot{width:8px;height:8px;border-radius:50%;background:#c4c9d2;flex:none;transition:.2s}
+  .dot.live{background:var(--ok);box-shadow:0 0 6px rgba(15,157,88,.55)}
+  .main{flex:1;min-width:0}
+  .nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta{font-size:11px;color:var(--sub);line-height:1.4}
+  .m1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .m2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .val{font-family:var(--mono);font-size:12px;color:var(--acc);text-align:right;
+       white-space:pre;line-height:1.35;flex:none;max-width:46%}
+  .caret{color:#b6bac3;font-size:11px;flex:none;transition:.2s}
+  .sen.open .caret{transform:rotate(90deg)}
+  .detail{display:none;border-top:1px dashed var(--line);padding:10px 12px 12px;background:#fafbfd}
+  .sen.open .detail{display:block}
+  .kv{display:flex;font-size:12px;padding:2.5px 0}
+  .kv b{width:88px;flex:none;color:var(--sub);font-weight:400}
+  .kv span{font-family:var(--mono);word-break:break-all}
+  .vals{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px}
+  .pv{background:#eef2fd;border-radius:8px;padding:5px 9px;font-size:12px}
+  .pv b{display:block;font-size:10px;color:var(--sub);font-weight:500}
+  .pv span{font-family:var(--mono);font-size:15px;color:var(--acc)}
+  .age{font-size:11px;color:var(--sub)}
+</style>
+</head>
+<body>
+<header>
+  <h1><button id="tk-back" aria-label="返回 Tookies" style="flex:0 0 auto;min-width:36px;height:36px;padding:0 10px;margin-right:6px;background:transparent;border:0;color:inherit;font-size:20px;line-height:1;">‹</button>传感器</h1>
+  <div class="sub" id="sum">枚举中…</div>
+  <div class="toolbar">
+    <button id="bAll">全部监听</button>
+    <button id="bNone">全部停止</button>
+    <button id="bExpand">全部展开</button>
+  </div>
+</header>
+<div id="list"></div>
+
+<script>
+/* ============ Android 官方 Sensor 类型常量（对照 developer.android.com/reference/android/hardware/Sensor.html 字段表逐条核对） ============ */
+var TYPE_META = {
+  1:{n:"加速度",u:"m/s²",ax:["X","Y","Z"]},
+  2:{n:"磁场",u:"µT",ax:["X","Y","Z"]},
+  4:{n:"陀螺仪",u:"rad/s",ax:["X","Y","Z"]},
+  5:{n:"光线",u:"lx",ax:["照度"]},
+  9:{n:"重力",u:"m/s²",ax:["X","Y","Z"]},
+  10:{n:"线性加速度",u:"m/s²",ax:["X","Y","Z"]},
+  11:{n:"旋转矢量",u:"",ax:["x","y","z","w","精度"]},
+  33171055:{n:"光线",u:"lx",ax:["照度"]}
+};
+var RM_NAME = {0:"连续",1:"随变化",2:"单次",3:"特殊触发"};
+
+var sensors = [];      // 固定清单命中的传感器(本地序号)
+var nat2loc = {};      // 原生序号 -> 本地序号
+var listened = [];     // 是否已注册监听
+var lastEvt = {};      // idx -> {t(事件ns), wall(本地ms), a, v[]}
+var els = {};          // idx -> {dot,val,pv,age,err}
+
+/* ============ 渲染 ============ */
+function fmt(x){
+  var a = Math.abs(x);
+  if (a >= 100) return x.toFixed(1);
+  if (a >= 10)  return x.toFixed(2);
+  if (a >= 1)   return x.toFixed(3);
+  if (a >= 0.001 || a === 0) return x.toFixed(4);
+  return x.toExponential(2);
+}
+function build(){
+  var list = document.getElementById("list");
+  var html = [];
+  for (var i=0;i<sensors.length;i++){
+    var s = sensors[i];
+    var nm = s.name;
+    html.push(
+      '<div class="sen" id="sen'+i+'">',
+        '<div class="row" onclick="tglListen('+i+')">',
+          '<div class="dotbox" id="dbox'+i+'">',
+            '<div class="dot'+(listened[i]?' live':'')+'" id="dot'+i+'"></div>',
+          '</div>',
+          '<div class="main">',
+            '<div class="nm">'+nm+'</div>',
+            '<div class="meta m1">'+tName(s.type)+' · '+s.vendor+' · v'+s.ver+'</div>',
+          '</div>',
+          '<div class="val" id="val'+i+'" onclick="event.stopPropagation();toggle('+i+')"></div>',
+          '<div class="caret" id="car'+i+'" onclick="event.stopPropagation();toggle('+i+')">▶</div>',
+        '</div>',
+        '<div class="detail" id="dt'+i+'">',
+          '<div class="kv"><b>字符串类型</b><span>'+s.stype+'</span></div>',
+          '<div class="kv"><b>上报模式</b><span>'+RM_NAME[s.rm]+(s.wk?' · 唤醒型':' · 非唤醒')+'</span></div>',
+          '<div class="kv"><b>功耗</b><span>'+s.pw+' mA</span></div>',
+          '<div class="kv"><b>分辨率</b><span>'+s.res+'</span></div>',
+          '<div class="kv"><b>最大量程</b><span>'+s.rng+'</span></div>',
+          '<div class="kv"><b>最小延迟</b><span>'+(s.mind<0?"触发型(无连续流)":s.mind+" µs")+'</span></div>',
+          '<div class="kv"><b>最大延迟</b><span>'+(s.maxd>0?s.maxd+" µs":"—")+'</span></div>',
+          '<div class="kv"><b>FIFO 上限</b><span>'+(s.fifo>0?s.fifo+" 事件":"无")+'</span></div>',
+          '<div class="vals" id="pv'+i+'"></div>',
+          '<div class="age" id="age'+i+'">未收到数据</div>',
+        '</div>',
+      '</div>');
+  }
+  list.innerHTML = html.join("");
+  for (var j=0;j<sensors.length;j++){
+    els[j] = { dot:document.getElementById("dot"+j),
+               val:document.getElementById("val"+j),
+               pv:document.getElementById("pv"+j),
+               age:document.getElementById("age"+j) };
+  }
+  updSum();
+}
+function tName(t){
+  var m = TYPE_META[t];
+  if (m) return m.n;
+  return "类型"+t;
+}
+function toggle(i){ document.getElementById("sen"+i).classList.toggle("open"); }
+
+/* ============ 数据刷新 ============ */
+var ACC_NAME = ["不可靠","低","中","高"];
+var MAXV = { 6: 1 };   // WANT序号->最多显示的分量数(6=OPLUS光感仅照度)
+function widOf(i){ return sensors[i] ? sensors[i].w : -1; }
+function renderVals(i){
+  var s = sensors[i], e = lastEvt[i], el = els[i];
+  if (!e) return;
+  var m = TYPE_META[s.type];
+  var cap = MAXV[widOf(i)] || e.v.length;
+  var parts = [];
+  for (var k=0;k<cap;k++){
+    var label = (m && m.ax && m.ax[k]) ? m.ax[k] : ("v"+k);
+    parts.push(label+":"+fmt(e.v[k]));
+  }
+  el.val.textContent = parts.join("\n") + (m&&m.u?("\n"+m.u):"");
+  if (document.getElementById("sen"+i).classList.contains("open")){
+    var h = [];
+    for (var q=0;q<cap;q++){
+      var lb = (m && m.ax && m.ax[q]) ? m.ax[q] : ("v"+q);
+      h.push('<div class="pv"><b>'+lb+'</b><span>'+fmt(e.v[q])+'</span></div>');
+    }
+    if (m && m.u) h.push('<div class="pv"><b>单位</b><span>'+m.u+'</span></div>');
+    h.push('<div class="pv"><b>精度</b><span>'+ACC_NAME[e.a>=0?e.a:0]+'</span></div>');
+    el.pv.innerHTML = h.join("");
+  }
+  var dt = (Date.now() - e.wall)/1000;
+  el.age.textContent = "事件年龄 "+dt.toFixed(1)+"s · 精度 "+ACC_NAME[e.a>=0?e.a:0];
+}
+
+/* 原生推送入口（200ms 批量） */
+window.__push = function(o){
+  for (var k in o){
+    var i = nat2loc[+k];              // 原生序号 → 本地卡片
+    if (i === undefined) continue;    // 清单外的推送直接丢弃
+    if (!listened[i]) continue;       // 未在监听的卡片不接收(迟到数据防线)
+    var d = o[k];
+    lastEvt[i] = { t:d.t, wall:Date.now(), a:d.a, v:d.v };
+    renderVals(i);
+  }
+};
+
+/* ============ 监听管理 ============ */
+function listen(i){
+  if (listened[i]) return;
+  var r = "异常";
+  try { r = Sensors.listen(sensors[i].i); } catch(ex){ r = String(ex); }
+  if (r === "ok"){
+    listened[i] = true;
+    els[i].dot.className = "dot live";
+  }
+  updSum();
+}
+
+function tglListen(i){
+  if (listened[i]) stop(i);
+  else listen(i);
+}
+function stop(i){
+  try { Sensors.stop(sensors[i].i); } catch(ex){}
+  listened[i] = false;
+  els[i].dot.className = "dot";
+  els[i].val.textContent = "";
+  updSum();
+}
+function stopAll(){
+  try { Sensors.stopAll(); } catch(ex){}
+  for (var i=0;i<listened.length;i++){
+    listened[i]=false; els[i].dot.className="dot"; els[i].val.textContent="";
+  }
+  updSum();
+}
+function updSum(){
+  var n=0; for (var i=0;i<listened.length;i++) if (listened[i]) n++;
+  document.getElementById("sum").textContent =
+    "正在监听传感器 "+n+"/"+sensors.length;
+}
+function listenAll(){
+  for (var i=0;i<sensors.length;i++) listen(i);
+}
+
+/* 前后台切换：onPause 已全部注销，resume 后按页面状态重挂 */
+window.__resume = function(){
+  var re = [];
+  for (var i=0;i<listened.length;i++) if (listened[i]) re.push(i);
+  for (var j=0;j<re.length;j++){
+    listened[re[j]] = false;
+    try { if (Sensors.listen(re[j]) === "ok") listened[re[j]] = true; } catch(ex){}
+    if (listened[re[j]]) els[re[j]].dot.className = "dot live";
+  }
+  updSum();
+};
+
+/* ============ 固定传感器清单（不再全量枚举+过滤） ============ */
+/* 按名称匹配 device.getSensorList 中的原生条目, 同名取第一个; 未匹配的忽略 */
+var WANT = [
+  "bmi26x Accelerometer",                    // 加速度
+  "ak0991x Magnetometer",                    // 磁场
+  "Rotation Vector",                         // 旋转矢量
+  "bmi26x Gyroscope",                        // 陀螺仪
+  "gravity",                                 // 重力
+  "linear_acceleration",                     // 线性加速度
+  "OPLUS Fusion Light Sensor Next Gen"       // 光线(仅显示照度)
+];
+function matchWant(n){
+  var s = String(n);
+  for (var k=0;k<WANT.length;k++){
+    if (s.indexOf(WANT[k]) === 0) return k;
+  }
+  return -1;
+}
+function init(){
+  var raw = Sensors.getSensors();
+  var all = JSON.parse(raw);
+  var slot = {};   // want序 -> 原生传感器
+  for (var i=0;i<all.length;i++){
+    var w = matchWant(all[i].name);
+    if (w >= 0 && !slot[w]) slot[w] = all[i];
+  }
+  for (var k=0;k<WANT.length;k++){
+    if (!slot[k]) continue;                  // 本机没有的条目直接跳过
+    slot[k].w = k;                           // 记住 WANT 序号(分量上限等配置用)
+    nat2loc[slot[k].i] = sensors.length;
+    sensors.push(slot[k]);
+  }
+  build();
+  listenAll();   // 探测注册+剔除失败
+  stopAll();     // 默认全部停止
+}
+document.getElementById("tk-back").onclick = function(){location.href="index.html";};
+document.getElementById("bAll").onclick = listenAll;
+document.getElementById("bNone").onclick = stopAll;
+document.getElementById("bExpand").onclick = function(){
+  var any = false;
+  for (var i=0;i<sensors.length;i++)
+    if (!document.getElementById("sen"+i).classList.contains("open")) any=true;
+  for (var j=0;j<sensors.length;j++)
+    document.getElementById("sen"+j).classList.toggle("open", any);
+  this.textContent = any ? "全部收起" : "全部展开";
+};
+init();
+</script>
+</body>
+</html>
