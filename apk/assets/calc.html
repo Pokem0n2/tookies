@@ -88,10 +88,24 @@
     backdrop-filter: blur(22px) saturate(1.6);
     border-top: 0.5px solid var(--hairline);
   }
+  /* 横屏分屏：键盘靠右成列，画布让出右侧空间（resize 事件已监听，坐标自动跟随） */
+  @media (orientation:landscape) and (min-width: 600px) {
+    #keypad {
+      top: 0; bottom: 0; left: auto; right: 0;
+      width: 300px; overflow-y: auto;
+      padding: 10px 10px calc(10px + env(safe-area-inset-right));
+      border-top: none; border-left: 0.5px solid var(--hairline);
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    #keypad .grid { flex: 0 0 auto; }
+    #keypad .key { height: 44px; font-size: 20px; }
+    #keypad .drawer { justify-content: center; padding: 0 0 6px; }
+  }
   #keypad .drawer {
     display: flex; align-items: center; justify-content: flex-end;
     padding: 0 4px 6px;
   }
+  /* 横屏分屏时 drawer 里的 fx 按钮横向居中（由 media query 内覆写） */
   #fx-toggle {
     border: none; background: transparent; color: var(--accent);
     font-family: inherit; font-size: 14px; font-weight: 700; font-style: italic;
