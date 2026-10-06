@@ -105,7 +105,7 @@
   }
   #keypad .drawer {
     display: flex; align-items: center; justify-content: flex-end;
-    padding: 0 4px 6px;
+    padding: 0 4px 0;
   }
   /* 横屏分屏时 drawer 里的 fx 按钮横向居中（由 media query 内覆写） */
   #fx-toggle {
@@ -118,10 +118,11 @@
   #sci {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
     max-height: 0; overflow: hidden;
-    transition: max-height .22s ease, margin-bottom .22s ease;
-    margin-bottom: 0;
+    margin-top: 6px; margin-bottom: 0;
+    transition: max-height .22s ease, margin-top .22s ease, margin-bottom .22s ease;
   }
-  #sci.open { max-height: 200px; margin-bottom: 8px; }
+  /* 展开后：fx 按钮→面板顶部、面板最下排→主键盘，均留白 20px */
+  #sci.open { max-height: 200px; margin-top: 20px; margin-bottom: 20px; }
   #sci .key { height: 42px; font-size: 17px; }
   #keypad .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .key {
