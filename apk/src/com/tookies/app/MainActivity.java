@@ -104,16 +104,23 @@ public void onBackPressed() {
 final String req = "window.__tydligBack ? window.__tydligBack() : false";
 webView.evaluateJavascript(req, new BackHandler(webView));
 }
-/** 返回键回调：页面未处理时 WebView 后退（回到主页）。 */
+/** 返回键回调：页面未处理时，主页→退出应用；模块页→WebView 后退（回到主页）。 */
 static class BackHandler implements ValueCallback {private final WebView webView;
 BackHandler(WebView webView) { this.webView = webView; }
 @Override
 public void onReceiveValue(Object result) {
 String r = (result == null) ? null : String.valueOf(result);
-if (!"true".equals(r)) {
+if ("true".equals(r)) return; // 页面已自行处理（如 xCalc 收起面板）
+String url = webView.getUrl();
+if (url != null && url.endsWith("index.html")) {
+// 主页返回键 = 退出应用。模块页 ‹ 按钮以 location.href 跳回主页，
+// 历史栈会残留模块页条目，若走 goBack() 会回到模块页而非退出。
+Activity a = (Activity) webView.getContext();
+a.finish();
+return;
+}
 if (webView.canGoBack()) webView.goBack();
 // else: stay on current page (back is handled by in-app back button)
-}
 }
 }
 /** 提供给页面 JS 的原生能力：系统分享、Toast（xCalc 导出画布用）。 */
