@@ -88,18 +88,37 @@
     backdrop-filter: blur(22px) saturate(1.6);
     border-top: 0.5px solid var(--hairline);
   }
-  /* 横屏分屏：键盘靠右成列，画布让出右侧空间（resize 事件已监听，坐标自动跟随） */
+  #keypad .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  #sci {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    max-height: 0; overflow: hidden;
+    margin-top: 6px; margin-bottom: 0;
+    transition: max-height .22s ease, margin-top .22s ease, margin-bottom .22s ease;
+  }
+  /* 展开后：fx 按钮→面板顶部、面板最下排→主键盘，均留白 20px */
+  #sci.open { max-height: 200px; margin-top: 20px; margin-bottom: 20px; }
+  #sci .key { height: 42px; font-size: 17px; }
+  /* 横屏分屏：键盘靠右成列，画布让出右侧空间（resize 事件已监听，坐标自动跟随）。
+     fx 展开后总内容高度必须 ≤ 视口高：上下留白 20px + 按键压缩(44/42→34, gap 8→6)，
+     否则 justify-content:center 溢出时上下两端裁切且顶部不可滚动（safe center 兜底）。 */
   @media (orientation:landscape) and (min-width: 600px) {
     #keypad {
       top: 0; bottom: 0; left: auto; right: 0;
       width: 300px; overflow-y: auto;
-      padding: 10px 10px calc(10px + env(safe-area-inset-right));
+      padding: 20px calc(12px + env(safe-area-inset-right)) 20px 10px;
       border-top: none; border-left: 0.5px solid var(--hairline);
-      display: flex; flex-direction: column; justify-content: center;
+      display: flex; flex-direction: column;
+      justify-content: center;
+      justify-content: safe center; /* 溢出时回退 start，顶部不被裁死 */
     }
     #keypad .grid { flex: 0 0 auto; }
-    #keypad .key { height: 44px; font-size: 20px; }
-    #keypad .drawer { justify-content: center; padding: 0 0 6px; }
+    #keypad .key { height: 34px; font-size: 17px; }
+    #sci .key { height: 34px; font-size: 15px; }
+    #keypad .grid, #sci { gap: 6px; }
+    #keypad .drawer { justify-content: center; padding: 0; }
+    #fx-toggle { padding: 2px 8px; font-size: 13px; }
+    /* fx→面板 / 面板→主键盘：横屏收紧为 8px（20px 留白由 keypad 上下 padding 提供） */
+    #sci.open { margin-top: 8px; margin-bottom: 8px; }
     /* 顶栏功能按钮（更多/撤销/重做）不能被键盘列遮挡：横屏时收窄至画布区 */
     #topbar { right: 300px; border-bottom: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
@@ -115,16 +134,6 @@
   }
   #fx-toggle:active { background: rgba(120,120,128,.16); }
   #fx-toggle.on { background: rgba(10,132,255,.15); }
-  #sci {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    max-height: 0; overflow: hidden;
-    margin-top: 6px; margin-bottom: 0;
-    transition: max-height .22s ease, margin-top .22s ease, margin-bottom .22s ease;
-  }
-  /* 展开后：fx 按钮→面板顶部、面板最下排→主键盘，均留白 20px */
-  #sci.open { max-height: 200px; margin-top: 20px; margin-bottom: 20px; }
-  #sci .key { height: 42px; font-size: 17px; }
-  #keypad .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .key {
     height: 50px; border: none; border-radius: 12px;
     background: var(--key-bg);
