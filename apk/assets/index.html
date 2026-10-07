@@ -213,8 +213,8 @@ var eraserCursorTimer=0;
 /* 橡皮擦轮廓：显示在"实际擦除发生的位置"（触点 + 偏移） */
 function showEraserCursor(canvasX,canvasY){
   var r=cv.getBoundingClientRect();
-  var size=Math.max(currentSize,10);
-  var cx=r.left+canvasX,cy=r.top+canvasY;
+  var size=Math.max(currentSize,10)*pv.s;
+  var cx=r.left+pv.tx+canvasX*pv.s,cy=r.top+pv.ty+canvasY*pv.s;
   eraserCursor.style.width=size+"px";
   eraserCursor.style.height=size+"px";
   eraserCursor.style.left=(cx-size/2)+"px";
@@ -235,6 +235,8 @@ function showTouchDot(clientX,clientY){
 }
 function hideTouchDot(){touchDot.classList.remove("show");}
 var strokes=[],redoStack=[],current=null,drawing=false;
+/* 画布视图变换：世界坐标(笔画)不变，pinch 只改 s/tx/ty */
+var pv={s:1,tx:0,ty:0},pinching=false,pinch0=null,lastTapAt=0;
 var currentColor="#000000",currentSize=2,isEraser=false;
 var COLORS=["#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#9e9e9e"];
 var BRUSH_PREVIEW_MS=700,brushTimer=0;
@@ -255,7 +257,7 @@ function paintResize(){
   if(!cv)return;
   var r=cv.getBoundingClientRect();
   if(cv.width!==Math.floor(r.width)||cv.height!==Math.floor(r.height)){
-    cv.width=Math.floor(r.width);cv.height=Math.floor(r.height);redrawAll();
+    cv.width=Math.floor(r.width);cv.height=Math.floor(r.height);recenterView();redrawAll();
   }
 }
 function drawStroke(s){
@@ -268,15 +270,18 @@ function drawStroke(s){
     ctx.fillStyle=s.color;ctx.fill();
   }else{ctx.stroke();}
 }
+function applyView(){ctx.setTransform(pv.s,0,0,pv.s,pv.tx,pv.ty);}
 function redrawAll(){
+  ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,cv.width,cv.height);
+  applyView();
   for(var i=0;i<strokes.length;i++)drawStroke(strokes[i]);
 }
 function getPos(e){
   var r=cv.getBoundingClientRect();
   var t=e.touches?e.touches[0]:e;
-  /* 落笔位置相对触点偏移 (x-40, y-20)，避开手指遮挡 */
-  return{x:t.clientX-r.left-BRUSH_OFFSET_X,y:t.clientY-r.top-BRUSH_OFFSET_Y};
+  /* 落笔位置相对触点偏移 (x-40, y-20)，避开手指遮挡；偏移在屏幕系扣，再逆变换到世界系 */
+  return{x:(t.clientX-r.left-BRUSH_OFFSET_X-pv.tx)/pv.s,y:(t.clientY-r.top-BRUSH_OFFSET_Y-pv.ty)/pv.s};
 }
 /* 取原始触点（client 坐标），供预览点定位用 */
 function getRawPos(e){
@@ -286,6 +291,7 @@ function getRawPos(e){
 /* 触点落下：进入预览期，只显示落笔位置预览点，不落笔 */
 function paintStart(e){
   e.preventDefault();
+  if(e.touches&&e.touches.length>=2){beginPinch(e);return;}
   drawing=true;armed=false;redoStack.length=0;
   var rp=getRawPos(e);
   showTouchDot(rp.x,rp.y);
@@ -306,6 +312,7 @@ function paintStart(e){
 var pendingPos=null;
 /* 当前触点原始坐标（画布系，无偏移）：抬手时记录为手指最后位置 */
 function paintMove(e){
+  if(pinching){e.preventDefault();pinchMove(e);return;}
   if(!drawing)return;
   e.preventDefault();
   var p=getPos(e);
@@ -325,15 +332,65 @@ function paintMove(e){
   ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();
 }
 function paintEnd(e){
+  if(pinching){if(!e||!e.touches||e.touches.length===0){pinching=false;pinch0=null;}return;}
   if(!drawing)return;
   if(e)e.preventDefault();
   drawing=false;
   clearTimeout(delayTimer);
   hideTouchDot();
   /* 预览期内抬手：无实际笔迹，不入撤销栈 */
-  if(!(current&&current.points.length))strokes.pop();
+  if(!(current&&current.points.length)){strokes.pop();var now=Date.now();if(now-lastTapAt<300)resetView();lastTapAt=now;}
   armed=false;pendingPos=null;current=null;
 }
+function clampZ(v){return Math.min(8,Math.max(0.25,v));}
+function pinchState(e){
+  var a=e.touches[0],b=e.touches[1];
+  var dx=b.clientX-a.clientX,dy=b.clientY-a.clientY;
+  return{d:Math.sqrt(dx*dx+dy*dy),mx:(a.clientX+b.clientX)/2,my:(a.clientY+b.clientY)/2};
+}
+function beginPinch(e){
+  /* 第二指落下：中止进行中的笔画（已画部分保留），进入捏合缩放 */
+  if(drawing){
+    if(current&&current.points.length===0)strokes.pop();
+    drawing=false;armed=false;pendingPos=null;current=null;
+    clearTimeout(delayTimer);hideTouchDot();
+  }
+  pinching=true;pinch0=pinchState(e);
+}
+function pinchMove(e){
+  if(!pinching||!pinch0||!pinch0.d||e.touches.length<2)return;
+  var st=pinchState(e);
+  if(!st.d)return;
+  var r=cv.getBoundingClientRect();
+  var ns=clampZ(pv.s*st.d/pinch0.d);
+  /* 捏合中点下的世界点保持在指下（锚点缩放） */
+  var wx=(pinch0.mx-r.left-pv.tx)/pv.s,wy=(pinch0.my-r.top-pv.ty)/pv.s;
+  pv.s=ns;
+  pv.tx=(st.mx-r.left)-wx*ns;pv.ty=(st.my-r.top)-wy*ns;
+  pinch0=st;
+  redrawAll();
+}
+function strokesBBox(){
+  var minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9,n=0;
+  for(var i=0;i<strokes.length;i++){
+    var pts=strokes[i].points;
+    for(var j=0;j<pts.length;j++){
+      n++;var q=pts[j];
+      if(q.x<minX)minX=q.x;if(q.y<minY)minY=q.y;
+      if(q.x>maxX)maxX=q.x;if(q.y>maxY)maxY=q.y;
+    }
+  }
+  return n?{minX:minX,minY:minY,maxX:maxX,maxY:maxY}:null;
+}
+/* 旋转/尺寸变化后：内容 bbox 中心对准新画布中心（保持缩放倍率） */
+function recenterView(){
+  var b=strokesBBox();
+  if(!b){pv.s=1;pv.tx=0;pv.ty=0;return;}
+  pv.tx=cv.width/2-(b.minX+b.maxX)/2*pv.s;
+  pv.ty=cv.height/2-(b.minY+b.maxY)/2*pv.s;
+}
+/* 快速双击轻点：恢复 100% 原始视图 */
+function resetView(){pv.s=1;pv.tx=0;pv.ty=0;redrawAll();}
 function setColor(c){
   currentColor=c;isEraser=false;
   eraserBtn.classList.remove("on");
@@ -401,6 +458,15 @@ function paintInit(){
   cv.addEventListener("touchend",paintEnd);
   cv.addEventListener("mouseup",paintEnd);
   cv.addEventListener("mouseleave",paintEnd);
+  cv.addEventListener("wheel",function(e){
+    e.preventDefault();
+    var r=cv.getBoundingClientRect();
+    var ns=clampZ(pv.s*(e.deltaY<0?1.1:0.9));
+    var mx=e.clientX-r.left,my=e.clientY-r.top;
+    var wx=(mx-pv.tx)/pv.s,wy=(my-pv.ty)/pv.s;
+    pv.s=ns;pv.tx=mx-wx*ns;pv.ty=my-wy*ns;
+    redrawAll();
+  },{passive:false});
   window.addEventListener("resize",paintResize);
   paintResize();
 }
