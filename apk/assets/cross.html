@@ -345,14 +345,14 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
   .stat{font-size:13px;padding:4px 10px}
   .seed-row{grid-area:3/1;margin-top:8px;text-align:center}
   .seed-btns{grid-area:4/1;margin-top:12px;flex-direction:column;align-items:center;gap:14px}
-  /* 底行满宽：视觉模式居左 / NEW GAME 居中 / CRACK 居右（space-between 三元素天然三分） */
-  footer#ftr{grid-column:1/-1;grid-row:6;position:static;width:auto;max-width:none;
-             flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:8px 16px;z-index:15}
+  /* 底行在 L 区最下排：视觉模式居左 / NEW GAME 居中 / CRACK 居右 */
+  footer#ftr{grid-column:1;grid-row:6;position:static;width:auto;max-width:none;
+             flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:8px 14px;z-index:15}
   /* 撤销：移入 R 区右侧留白带居中；棋盘各难度等大（顶满R高）→位置天然固定 */
   .undo-btn{position:absolute;z-index:15;margin:0;left:50%;transform:translate(-50%,-50%);top:0}
   /* JS 按 R 区几何定位（data-land-undo 在 updAux 横屏分支维护） */
   /* R 区：矩阵+辅助数值 顶满 R 高度（适当留白）并居中 */
-  #game{grid-area:2/2/6/3;display:flex;align-items:center;justify-content:center;padding:8px 10px}
+  #game{grid-area:2/2/7/3;display:flex;align-items:center;justify-content:center;padding:8px 10px}
   #gwrap{max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
   #aux{position:absolute;inset:0}
 
