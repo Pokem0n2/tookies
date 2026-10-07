@@ -331,25 +331,29 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
 
 /* ═══ v0.12.2 Landscape：顶栏两态统一 + 游戏态左UI右棋盘 ═══ */
 @media (orientation:landscape){
-  /* 游戏态：#app 改 grid——顶栏(.hdr-top)横跨全宽首行，stats/seed 左列，棋盘右列 */
-  #app{max-width:none;display:grid;grid-template-columns:auto 1fr;
-       grid-template-rows:auto auto auto auto 1fr;align-items:stretch}
+  /* 游戏态：#app 改 grid——顶栏横跨全宽首行；L=左半屏 R=右半屏 各1fr；底行满宽 */
+  #app{max-width:none;display:grid;grid-template-columns:1fr 1fr;
+       grid-template-rows:auto auto auto auto 1fr auto;align-items:stretch}
   header{display:contents}
   .hdr-top{grid-column:1/-1;grid-row:1;display:flex;align-items:center;flex-wrap:nowrap;
            position:relative;z-index:10;padding:10px 12px 0}
   .logo{letter-spacing:4px;font-size:20px;transform:none!important;margin-right:auto;margin-left:7px}
   /* 声音/语言/帮助：绝对居中于顶栏（两态同一条规则） */
   .hdr-btns{position:absolute;left:50%;transform:translateX(-50%);top:10px}
-  .stats{grid-area:2/1;margin-top:6px;justify-content:flex-start}
+  /* L 区：统计行/种子行水平居中，三按钮竖向等距排列 */
+  .stats{grid-area:2/1;margin-top:8px;justify-content:center}
   .stat{font-size:13px;padding:4px 10px}
-  .seed-row{grid-area:3/1;margin-top:8px;text-align:left}
-  .seed-btns{grid-area:4/1;margin-top:6px;justify-content:flex-start}
-  /* footer/undo 是 #app 的行内子元素，横屏下沉到左栏底部 */
-  footer#ftr{position:absolute;left:12px;bottom:12px;width:220px;flex-wrap:wrap;gap:6px;justify-content:flex-start;z-index:15}
-  .undo-btn{position:absolute;left:110px;bottom:64px;transform:none;z-index:15}
-  /* 右半屏：棋盘居中 + 辅助数值覆盖层 */
-  #game{grid-area:2/2/6/3;display:flex;align-items:center;justify-content:center;padding:8px 0 8px 16px}
-  #gwrap{width:min(64vh,100%) !important;max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
+  .seed-row{grid-area:3/1;margin-top:8px;text-align:center}
+  .seed-btns{grid-area:4/1;margin-top:12px;flex-direction:column;align-items:center;gap:14px}
+  /* 底行满宽：视觉模式居左 / NEW GAME 居中 / CRACK 居右（space-between 三元素天然三分） */
+  footer#ftr{grid-column:1/-1;grid-row:6;position:static;width:auto;max-width:none;
+             flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:8px 16px;z-index:15}
+  /* 撤销：移入 R 区右侧留白带居中；棋盘各难度等大（顶满R高）→位置天然固定 */
+  .undo-btn{position:absolute;z-index:15;margin:0;left:50%;transform:translate(-50%,-50%);top:0}
+  /* JS 按 R 区几何定位（data-land-undo 在 updAux 横屏分支维护） */
+  /* R 区：矩阵+辅助数值 顶满 R 高度（适当留白）并居中 */
+  #game{grid-area:2/2/6/3;display:flex;align-items:center;justify-content:center;padding:8px 10px}
+  #gwrap{max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
   #aux{position:absolute;inset:0}
 
   /* Launcher 态（body.launch-on）：恢复竖屏列布局；顶栏沿用上方通用规则 */
@@ -910,9 +914,29 @@ function updAux(){
      width shrinks per-N so the scaled digits still fit inside the screen. */
   const vw=Math.min(document.documentElement.clientWidth,window.innerWidth||1e9);
   if(window.matchMedia('(orientation:landscape)').matches){
-    /* v0.11.2 横屏：宽度交给 CSS media 规则 min(78vh,100%)——内联 vw 公式是竖屏专属，
-       会在横屏把棋盘钳到 360px 且压过样式表 */
-    $('gwrap').style.width='';
+    /* v0.12.3 横屏：棋盘顶满 R 区高度（R=右半屏，含上下辅助数字带），JS 解算尺寸。
+       R 区 = #game 的 content box；可用高 = R高 - 上下留白(8×2)；辅助带高 = 字号14 + gap10。 */
+    const gEl=$('game');
+    const cs=getComputedStyle(gEl);
+    const RH=gEl.clientHeight - parseFloat(cs.paddingTop||0) - parseFloat(cs.paddingBottom||0) - 16;
+    const RW=gEl.clientWidth - parseFloat(cs.paddingLeft||0) - parseFloat(cs.paddingRight||0);
+    /* 迭代解算：棋盘 + 上下辅助带(fs+gap) = R 可用高；fs 封顶 20 防小 N 放大 */
+    let side=Math.min(RH-58,RW);
+    for(let k=0;k<3;k++){
+      const fs=Math.min(20,Math.max(14,Math.round((side/N)*0.45)));
+      const gap=Math.max(10,Math.round(fs*1.1));
+      side=Math.max(160,Math.min(RH-2*(gap+fs),RW));
+    }
+    $('gwrap').style.width=side+'px';
+    /* 撤销按钮：固定在 R 区右侧留白带（x=棋盘右缘+固定偏移，y=R 区中心）——各难度同位 */
+    const undo=$('bu');
+    if(undo && undo.style.display!=='none'){
+      undo.style.left='';
+      /* 固定锚点：R 区右缘内 36px、垂直 R 区中心——与棋盘尺寸/难度无关 */
+      const gR=gEl.getBoundingClientRect();
+      undo.style.left=(gR.right - 36)+'px';
+      undo.style.top=(gR.top + gEl.clientHeight/2)+'px';
+    }
   }else{
     const shrink={4:0.68,6:0.78,8:0.82,10:0.84}[N]||0.84;
     $('gwrap').style.width=`min(${Math.round(shrink*100)}vw,360px)`;
