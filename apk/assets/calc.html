@@ -528,19 +528,39 @@ function bandRect() {
 }
 /* 上次可视带中心（世界坐标）——旋转屏幕时保持该点仍在可视带中心 */
 let prevBandCenterWorld = null;
+/* resize 拆两步：先量尺寸/可视带，再按需触发 fitView。
+   旋转（W/H 交换）或画布非空时的 band 明显变化 → 完整 fit+居中（等同点工具栏"适应视图"）；
+   小扰动（键盘弹出等）→ 维持旧策略保缩放重居中。 */
+let lastW = 0, lastH = 0;
 function resize() {
   DPR = Math.min(window.devicePixelRatio || 1, 3);
+  const prevW = W, prevH = H;
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const rotated = lastW > 0 && ((prevW > prevH) !== (W > H));
   const b = bandRect();
-  if (prevBandCenterWorld && b.x1 > b.x0 && b.y1 > b.y0) {
+  if (prevBandCenterWorld && !rotated && b.x1 > b.x0 && b.y1 > b.y0) {
     const bcx = (b.x0 + b.x1) / 2, bcy = (b.y0 + b.y1) / 2;
     cam.cx = prevBandCenterWorld.x - (bcx - W / 2) / cam.s;
     cam.cy = prevBandCenterWorld.y - (bcy - H / 2) / cam.s;
   }
   prevBandCenterWorld = bandCenterWorld();
+  lastW = W; lastH = H;
+  /* 旋转后让内容完整落入新可视带：缩放到恰好装下+居中（与手动点"适应视图"一致）。
+     延迟一帧执行：WebView 旋转时 innerWidth/innerHeight 可能先到再改，量到的 band 是旧的 */
+  if (rotated && nodes.length > 0) {
+    requestAnimationFrame(() => { resize2(); });
+  }
   scheduleSave();
+}
+/* 第二步：几何稳定后完整 fit（fitView 内部会再更新 prevBandCenterWorld） */
+function resize2() {
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  fitView();
 }
 function bandCenterWorld() {
   const b = bandRect();
