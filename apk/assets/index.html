@@ -191,6 +191,16 @@ function show(v,t){
   location.hash=v==="view-home"?"":"#"+tool;
 }
 backBtn.addEventListener("click",function(){show("view-home");});
+/* 系统返回手势（MainActivity evaluateJavascript 探询）：
+   站内 hash 视图(paint/ruler)先回主页；已在主页返回 false 交原生退出。
+   历史栈里的 index.html#paint / index.html# 尾缀条目会让 URL 判断失真，
+   故由页面自报状态，原生侧不再依赖 goBack() 弹跳。 */
+window.__tookiesBack=function(){
+  var h=location.hash;
+  if(h===""||h==="#")return false;
+  show("view-home");
+  return true;
+};
 function route(){
   var h=location.hash.replace("#","");
   if(h==="paint")show("view-paint","涂鸦板");

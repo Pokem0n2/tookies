@@ -98,29 +98,31 @@ super.onActivityResult(requestCode, resultCode, data);
 }
 @Override
 public void onBackPressed() {
-// 计算器(xCalc)页面：优先让页面收起面板/取消待定运算符，再 WebView 后退
-// 注：ValueCallback 用 raw type 实现（onReceiveValue(Object)），
-//     避开本机 d8 8.2.2 对泛型 Signature 属性的 NPE 崩溃（类文件版本 65）。
-final String req = "window.__tydligBack ? window.__tydligBack() : false";
+// 系统返回手势：先让页面自处理（收面板/站内回主页），页面放弃时原生接手。
+// 注：ValueCallback raw type（onReceiveValue(Object)）避开 d8 8.2.2 泛型 NPE。
+final String req = "(window.__tookiesBack ? window.__tookiesBack() : (window.__tydligBack ? window.__tydligBack() : false))";
 webView.evaluateJavascript(req, new BackHandler(webView));
 }
-/** 返回键回调：页面未处理时，主页→退出应用；模块页→WebView 后退（回到主页）。 */
+/** 返回手势回调：页面自报已处理(true)则结束；否则主页→finish() 退出，模块页→显式回主页（不用 goBack）。 */
 static class BackHandler implements ValueCallback {private final WebView webView;
 BackHandler(WebView webView) { this.webView = webView; }
 @Override
 public void onReceiveValue(Object result) {
 String r = (result == null) ? null : String.valueOf(result);
-if ("true".equals(r)) return; // 页面已自行处理（如 xCalc 收起面板）
+if ("true".equals(r)) return; // 页面已处理（收起面板/站内回主页）
 String url = webView.getUrl();
-if (url != null && url.endsWith("index.html")) {
-// 主页返回键 = 退出应用。模块页 ‹ 按钮以 location.href 跳回主页，
-// 历史栈会残留模块页条目，若走 goBack() 会回到模块页而非退出。
+if (url == null) return;
+/* 去掉 #fragment 后取文档名：index.html#paint/# 等尾缀条目会让 endsWith("index.html") 失真 */
+String doc = url;
+int h = doc.indexOf('#');
+if (h >= 0) doc = doc.substring(0, h);
+if (doc.endsWith("/index.html") || doc.endsWith("index.html")) {
 Activity a = (Activity) webView.getContext();
-a.finish();
+a.finish(); // 主页返回手势 = 退出应用
 return;
 }
-if (webView.canGoBack()) webView.goBack();
-// else: stay on current page (back is handled by in-app back button)
+/* 模块页：历史栈可能残留多条条目（location.href 往返跳转），不 goBack 弹跳，直接回主页 */
+webView.loadUrl("file:///android_asset/index.html");
 }
 }
 /** 提供给页面 JS 的原生能力：系统分享、Toast（xCalc 导出画布用）。 */
