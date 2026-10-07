@@ -332,7 +332,7 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
 /* ═══ v0.12.2 Landscape：顶栏两态统一 + 游戏态左UI右棋盘 ═══ */
 @media (orientation:landscape){
   /* 游戏态：#app 改 grid——顶栏横跨全宽首行；L=左半屏 R=右半屏 各1fr；底行满宽 */
-  #app{max-width:none;display:grid;grid-template-columns:1fr 1fr;
+  #app{max-width:none;display:grid;grid-template-columns:2fr 3fr;
        grid-template-rows:auto auto auto auto 1fr auto;align-items:stretch}
   header{display:contents}
   .hdr-top{grid-column:1/-1;grid-row:1;display:flex;align-items:center;flex-wrap:nowrap;
