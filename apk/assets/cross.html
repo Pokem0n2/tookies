@@ -347,17 +347,25 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
   #game{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:8px 0 8px 16px}
   #gwrap{width:min(64vh,100%) !important;max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
   #aux{position:absolute;inset:0}  /* aux 相对 #game 定位（#game position:relative 已有） */
-  /* Launcher 横屏：四难度卡一排 */
-  #launcher{margin-top:0;padding:0 12px}
-  .level-grid{grid-template-columns:repeat(4,1fr);max-width:none;gap:10px;width:100%}
-  .level-btn{padding:12px 8px;gap:4px}
-  .level-btn .lvl-grid{width:34px;height:34px;margin:2px 0}
-  .level-btn .lvl-name{font:700 12px/1.2 var(--font);letter-spacing:2px}
-  .level-btn .lvl-meta{font-size:9px}
-  .level-btn .lvl-desc{font-size:9px;max-width:120px;line-height:1.25}
-  .launch-sub{margin-bottom:12px;font-size:10px}
-  .launch-title{display:none}
-  #volPanel{left:0;right:auto}
+  /* Launcher 横屏（body.launch-on）：恢复竖屏列布局，顶栏几何与竖屏一致 */
+  body.launch-on #app{flex-direction:column}
+  body.launch-on header{width:100%;max-width:none;padding:12px 12px 0}
+  body.launch-on .hdr-top{flex-wrap:nowrap}
+  body.launch-on .logo{margin-right:auto}
+  /* 三按钮绝对居中于顶栏（header position:static 需 relative 锚定） */
+  body.launch-on header{position:relative}
+  body.launch-on .hdr-btns{position:absolute;left:50%;transform:translateX(-50%);top:12px}
+  /* 卡片：竖屏原尺寸（173px）一排，不留大边距 */
+  body.launch-on #launcher{margin-top:0;padding:0}
+  body.launch-on .level-grid{grid-template-columns:repeat(4,173px);justify-content:center;max-width:none;gap:10px;width:100%}
+  body.launch-on .level-btn{padding:16px}
+  body.launch-on .level-btn .lvl-grid{width:60px;height:60px;margin:6px 0}
+  body.launch-on .level-btn .lvl-name{font-size:18px;letter-spacing:3px}
+  body.launch-on .level-btn .lvl-meta{font-size:10px}
+  body.launch-on .level-btn .lvl-desc{font-size:11px;max-width:140px;line-height:1.3}
+  body.launch-on .launch-sub{margin-bottom:12px;font-size:10px}
+  body.launch-on .launch-title{display:none}
+  body.launch-on #volPanel{left:0;right:auto}
 }
 
 .hide{display:none!important}
@@ -1747,7 +1755,7 @@ function startLevel(level){
   currentLevel=level;
   $g.className='n'+N;
   // Hide launcher, show game UI (inline style like original HTML)
-  $('launcher').classList.add('hide');
+  $('launcher').classList.add('hide');document.body.classList.remove('launch-on');
   $('game').style.display='';
   $('ftr').style.display='';
   $('bu').style.display='';
@@ -1762,7 +1770,7 @@ function startLevel(level){
 function showLauncher(){
   crackStop=true;cracking=false;busy=false;tapped=false;
   stopBgm();
-  $('launcher').classList.remove('hide');
+  $('launcher').classList.remove('hide');document.body.classList.add('launch-on');
   $('game').style.display='none';
   $('ftr').style.display='none';
   $('bu').style.display='none';
@@ -1798,6 +1806,8 @@ function buildPreviews(){
 function init(){
   buildPreviews();
   load();
+  // 启动即 launcher 态：横屏 launcher 布局类（进游戏后由 startGame 移除）
+  document.body.classList.add('launch-on');
   document.documentElement.dataset.theme=theme;
   $('bt').innerHTML=theme==='valley'?SVG_DIAMOND:SVG_SQUARE;
   resizeCv();window.addEventListener('resize',resizeCv);
