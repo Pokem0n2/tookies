@@ -1553,14 +1553,17 @@ function render(t) {
 
   // 空画布引导
   if (nodes.length === 0) {
+    // 横屏分屏时说明文字需在键盘左侧的可见画布带内居中（与节点 fitView/重居中同一 bandRect）
+    const band = bandRect();
+    const bx = (band.x0 + band.x1) / 2;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = COLORS.ghost;
     ctx.font = `400 16px ${FONT_STACK}`;
-    ctx.fillText('点按键盘，把数字放到画布上', W / 2, H * 0.40);
+    ctx.fillText('点按键盘，把数字放到画布上', bx, H * 0.40);
     ctx.font = `400 13px ${FONT_STACK}`;
     ctx.fillStyle = COLORS.hint2;
-    ctx.fillText('选中数字后点运算符，再点另一个数字，结果会实时联动', W / 2, H * 0.40 + 26);
+    ctx.fillText('选中数字后点运算符，再点另一个数字，结果会实时联动', bx, H * 0.40 + 26);
     ctx.textBaseline = 'alphabetic';   // 恢复基线，避免 middle 泄漏到后续帧的测量/绘制
   }
 
