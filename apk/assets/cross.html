@@ -342,13 +342,14 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
   /* 声音/语言/帮助：绝对居中于顶栏（两态同一条规则） */
   .hdr-btns{position:absolute;left:50%;transform:translateX(-50%);top:10px}
   /* L 区：统计行/种子行水平居中，三按钮竖向等距排列 */
-  .stats{grid-area:2/1;margin-top:8px;justify-content:center}
+  .stats{grid-area:2/1;margin-top:30px;justify-content:center}
   .stat{font-size:13px;padding:4px 10px}
   .seed-row{grid-area:3/1;margin-top:8px;text-align:center}
-  .seed-btns{grid-area:4/1;margin-top:47px;display:grid;grid-template-columns:auto;justify-content:center;gap:25px}
+  .seed-btns{grid-area:4/1;margin-top:25px;display:grid;grid-template-columns:auto;justify-content:center;gap:25px}
   /* 底行在 L 区最下排：视觉模式居左 / NEW GAME 居中 / CRACK 居右 */
   footer#ftr{grid-column:1;grid-row:6;position:static;width:auto;max-width:none;
-             flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:8px 14px;z-index:15}
+             flex-wrap:nowrap;justify-content:space-between;gap:6px;padding:8px 14px;z-index:15;
+             margin-bottom:27px}
   /* 撤销：移入 R 区右侧留白带居中；棋盘各难度等大（顶满R高）→位置天然固定 */
   .undo-btn{position:absolute;z-index:15;margin:0;left:50%;transform:translate(-50%,-50%);top:0}
   /* JS 按 R 区几何定位（data-land-undo 在 updAux 横屏分支维护） */
