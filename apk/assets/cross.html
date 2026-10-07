@@ -329,33 +329,34 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
 [data-theme="pixel"] .level-btn .lvl-name{text-shadow:0 0 8px var(--lvl-color)}
 
 
-/* ═══ v0.11.2 Landscape: 左半屏 UI + 右半屏棋盘 ═══ */
+/* ═══ v0.12.2 Landscape：顶栏两态统一 + 游戏态左UI右棋盘 ═══ */
 @media (orientation:landscape){
-  /* 整体两栏：左栏=原竖屏 UI（header+stats+seed+footer+undo），右栏=棋盘 */
-  #app{max-width:none;flex-direction:row;align-items:stretch}
-  header{width:220px;max-width:220px;flex:0 0 auto;padding:12px 12px 0}
-  .hdr-top{flex-wrap:wrap;gap:6px}
-  .logo{letter-spacing:4px;font-size:20px;transform:none!important}
-  .stats{margin-top:10px;justify-content:flex-start}
+  /* 游戏态：#app 改 grid——顶栏(.hdr-top)横跨全宽首行，stats/seed 左列，棋盘右列 */
+  #app{max-width:none;display:grid;grid-template-columns:auto 1fr;
+       grid-template-rows:auto auto auto auto 1fr;align-items:stretch}
+  header{display:contents}
+  .hdr-top{grid-column:1/-1;grid-row:1;display:flex;align-items:center;flex-wrap:nowrap;
+           position:relative;z-index:10;padding:10px 12px 0}
+  .logo{letter-spacing:4px;font-size:20px;transform:none!important;margin-right:auto;margin-left:7px}
+  /* 声音/语言/帮助：绝对居中于顶栏（两态同一条规则） */
+  .hdr-btns{position:absolute;left:50%;transform:translateX(-50%);top:10px}
+  .stats{grid-area:2/1;margin-top:6px;justify-content:flex-start}
   .stat{font-size:13px;padding:4px 10px}
-  .seed-row{margin-top:8px}
-  .seed-btns{margin-top:6px}
-  /* footer/undo 是 #app 的行内子元素，横屏两栏下改为绝对定位沉到左栏底部 */
+  .seed-row{grid-area:3/1;margin-top:8px;text-align:left}
+  .seed-btns{grid-area:4/1;margin-top:6px;justify-content:flex-start}
+  /* footer/undo 是 #app 的行内子元素，横屏下沉到左栏底部 */
   footer#ftr{position:absolute;left:12px;bottom:12px;width:220px;flex-wrap:wrap;gap:6px;justify-content:flex-start;z-index:15}
   .undo-btn{position:absolute;left:110px;bottom:64px;transform:none;z-index:15}
   /* 右半屏：棋盘居中 + 辅助数值覆盖层 */
-  #game{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:8px 0 8px 16px}
+  #game{grid-area:2/2/6/3;display:flex;align-items:center;justify-content:center;padding:8px 0 8px 16px}
   #gwrap{width:min(64vh,100%) !important;max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
-  #aux{position:absolute;inset:0}  /* aux 相对 #game 定位（#game position:relative 已有） */
-  /* Launcher 横屏（body.launch-on）：恢复竖屏列布局，顶栏几何与竖屏一致 */
-  body.launch-on #app{flex-direction:column}
-  body.launch-on header{width:100%;max-width:none;padding:12px 12px 0}
-  body.launch-on .hdr-top{flex-wrap:nowrap}
-  body.launch-on .logo{margin-right:auto}
-  /* 三按钮绝对居中于顶栏（header position:static 需 relative 锚定） */
-  body.launch-on header{position:relative}
-  body.launch-on .hdr-btns{position:absolute;left:50%;transform:translateX(-50%);top:12px}
-  /* 卡片：竖屏原尺寸（173px）一排，不留大边距 */
+  #aux{position:absolute;inset:0}
+
+  /* Launcher 态（body.launch-on）：恢复竖屏列布局；顶栏沿用上方通用规则 */
+  body.launch-on #app{display:flex;flex-direction:column;align-items:center}
+  body.launch-on header{display:flex;flex-direction:column;gap:8px;width:100%;max-width:none;padding:0 12px}
+  body.launch-on .hdr-top{padding:10px 0 0}
+  /* 卡片：竖屏原尺寸（173px）一排 */
   body.launch-on #launcher{margin-top:0;padding:0}
   body.launch-on .level-grid{grid-template-columns:repeat(4,173px);justify-content:center;max-width:none;gap:10px;width:100%}
   body.launch-on .level-btn{padding:16px}
