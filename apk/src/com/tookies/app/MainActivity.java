@@ -73,6 +73,8 @@ private SensorsBridge sensorsBridge;
 protected void onPause() {
 // 传感器后台停流（省电）：注销全部监听；onResume 由页面 __resume() 按状态重挂
 if (sensorsBridge != null) sensorsBridge.stopAll();
+// 页面媒体后台暂停（BGM 后台静音省电，v0.12.6）；onResume 由 __resume() 恢复
+if (webView != null) webView.evaluateJavascript("window.__pause && window.__pause()", null);
 super.onPause();
 }
 @Override

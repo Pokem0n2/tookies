@@ -632,6 +632,19 @@ function toggleVolPanel(){
   var p=$('volPanel');
   if(p) p.classList.toggle('hide');
 }
+/* v0.12.6 后台暂停：壳 onPause → __pause() 停 BGM（省电+静音）；
+   onResume → __resume() 按音量/UI 状态恢复。不写 localStorage（音量设置不受影响） */
+var _bgmSuppressed=false;
+window.__pause=function(){
+  if(_bgmActive){ _bgmSuppressed=true; stopBgm(); }
+};
+window.__resume=function(){
+  if(_bgmSuppressed){
+    _bgmSuppressed=false;
+    /* 原版 BGM 在 launcher 也持续播（stopBgm 仅后台暂停时调用），故只要没静音就恢复 */
+    if(musicVol>0) startBgm();
+  }
+};
 function applyMusicVol(v){
   musicVol=v/100;
   try{ localStorage.setItem('cross_music_vol', musicVol); }catch(e){}
