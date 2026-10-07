@@ -93,10 +93,10 @@
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
     max-height: 0; overflow: hidden;
     margin-top: 6px; margin-bottom: 0;
-    transition: max-height .22s ease, margin-top .22s ease, margin-bottom .22s ease;
+    transition: max-height .22s ease, margin-top .22s ease, margin-bottom .22s ease, padding-bottom .22s ease;
   }
   /* 展开后：fx 按钮→面板顶部、面板最下排→主键盘，均留白 20px */
-  #sci.open { max-height: 200px; margin-top: 20px; margin-bottom: 20px; }
+  #sci.open { max-height: 200px; margin-top: 20px; margin-bottom: 16px; padding-bottom: 4px; }
   #sci .key { height: 42px; font-size: 17px; }
   /* 横屏分屏：键盘靠右成列，画布让出右侧空间（resize 事件已监听，坐标自动跟随）。
      fx 展开后总内容高度必须 ≤ 视口高：上下留白 20px + 按键压缩(44/42→34, gap 8→6)，
@@ -118,7 +118,7 @@
     #keypad .drawer { justify-content: center; padding: 0; }
     #fx-toggle { padding: 2px 8px; font-size: 13px; }
     /* fx→面板 / 面板→主键盘：横屏收紧为 8px（20px 留白由 keypad 上下 padding 提供） */
-    #sci.open { margin-top: 8px; margin-bottom: 8px; }
+    #sci.open { margin-top: 8px; margin-bottom: 4px; padding-bottom: 4px; }
     /* 顶栏功能按钮（更多/撤销/重做）不能被键盘列遮挡：横屏时收窄至画布区 */
     #topbar { right: 300px; border-bottom: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
