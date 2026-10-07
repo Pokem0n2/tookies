@@ -334,6 +334,7 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
   /* 游戏态：#app 改 grid——顶栏横跨全宽首行；L=左半屏 R=右半屏 各1fr；底行满宽 */
   #app{max-width:none;display:grid;grid-template-columns:2fr 3fr;
        grid-template-rows:auto auto auto auto 1fr auto;align-items:stretch}
+  body:not(.launch-on) #app{padding:0}
   header{display:contents}
   .hdr-top{grid-column:1/-1;grid-row:1;display:flex;align-items:center;flex-wrap:nowrap;
            position:relative;z-index:10;padding:10px 12px 0}
@@ -352,7 +353,7 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
   .undo-btn{position:absolute;z-index:15;margin:0;left:50%;transform:translate(-50%,-50%);top:0}
   /* JS 按 R 区几何定位（data-land-undo 在 updAux 横屏分支维护） */
   /* R 区：矩阵+辅助数值 顶满 R 高度（适当留白）并居中 */
-  #game{grid-area:2/2/7/3;display:flex;align-items:center;justify-content:center;padding:8px 10px}
+  #game{grid-area:2/2/7/3;display:flex;align-items:center;justify-content:center;padding:0 10px}
   #gwrap{max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
   #aux{position:absolute;inset:0}
 
@@ -941,6 +942,13 @@ function updAux(){
     const shrink={4:0.68,6:0.78,8:0.82,10:0.84}[N]||0.84;
     $('gwrap').style.width=`min(${Math.round(shrink*100)}vw,360px)`;
   }
+  renderAux();
+  if(window.matchMedia('(orientation:landscape)').matches)landFitAux();
+}
+function renderAux(){
+  const $a=$('aux');if(!$a)return;
+  if(!grid.length||!grid[0]||!grid[0].length)return;
+  if(!$g.children.length)return;
   const {cols,rows}=auxNumbers();
   const disp=v=>v===null?'':(v===-1?'0':String(v+1));   // raw v → displayed digit
   const sumd=v=>v===null?0:(v===-1?0:v+1);              // summand: empty-line min counts 0
@@ -1007,6 +1015,33 @@ function updAux(){
     }
   }
   $a.innerHTML=html;
+}
+function landFitAux(){
+  /* v0.12.5: 横屏上下留白精确 8px —— 实测辅助带(hslot)范围，反解棋盘边长收敛 */
+  const $aw=$('aux'),gEl=$('game');if(!$aw||!gEl)return;
+  const cs=getComputedStyle(gEl),gr=gEl.getBoundingClientRect();
+  const cTop=gr.top+parseFloat(cs.paddingTop||0)+parseFloat(cs.borderTopWidth||0);
+  const cBot=gr.bottom-parseFloat(cs.paddingBottom||0)-parseFloat(cs.borderBottomWidth||0);
+  const RW=gEl.clientWidth-parseFloat(cs.paddingLeft||0)-parseFloat(cs.paddingRight||0);
+  const target=(cBot-cTop)-16;                    /* 预算 = R内容高 − 8×2 */
+  let prev=null;
+  for(let t=0;t<6;t++){
+    const hs=[...$aw.querySelectorAll('.hslot')];
+    if(!hs.length)return;
+    let bTop=1e9,bBot=-1e9;
+    hs.forEach(e=>{const r=e.getBoundingClientRect();if(r.top<bTop)bTop=r.top;if(r.bottom>bBot)bBot=r.bottom;});
+    const band=bBot-bTop;
+    const d=target-band;
+    if(Math.abs(d)<=0.75)return;                  /* 已收敛（0.75=半像素级） */
+    const gw=$('gwrap');
+    const cur=gw.offsetWidth||parseFloat(gw.style.width)||200;
+    /* 增益 g=Δband/Δside（fs=cellH*0.45 → band 随 side 超线性）；首轮回退 2 */
+    let g=2;
+    if(prev&&Math.abs(cur-prev.side)>0.5)g=Math.max(0.5,Math.min(4,(band-prev.band)/(cur-prev.side)));
+    prev={side:cur,band};
+    gw.style.width=Math.max(140,Math.min(cur+d/g,RW))+'px';
+    renderAux();
+  }
 }
 function cr0W(cr){return Math.max(cr.width,14)}
 
