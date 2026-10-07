@@ -328,6 +328,38 @@ footer{display:flex;gap:8px;padding:10px 0;justify-content:space-between;width:1
 .level-btn .lvl-desc{font-size:11px;color:var(--txt-m);line-height:1.3;max-width:140px}
 [data-theme="pixel"] .level-btn .lvl-name{text-shadow:0 0 8px var(--lvl-color)}
 
+
+/* ═══ v0.11.2 Landscape: 左半屏 UI + 右半屏棋盘 ═══ */
+@media (orientation:landscape){
+  /* 整体两栏：左栏=原竖屏 UI（header+stats+seed+footer+undo），右栏=棋盘 */
+  #app{max-width:none;flex-direction:row;align-items:stretch}
+  header{width:220px;max-width:220px;flex:0 0 auto;padding:12px 12px 0}
+  .hdr-top{flex-wrap:wrap;gap:6px}
+  .logo{letter-spacing:4px;font-size:20px;transform:none!important}
+  .stats{margin-top:10px;justify-content:flex-start}
+  .stat{font-size:13px;padding:4px 10px}
+  .seed-row{margin-top:8px}
+  .seed-btns{margin-top:6px}
+  /* footer/undo 是 #app 的行内子元素，横屏两栏下改为绝对定位沉到左栏底部 */
+  footer#ftr{position:absolute;left:12px;bottom:12px;width:220px;flex-wrap:wrap;gap:6px;justify-content:flex-start;z-index:15}
+  .undo-btn{position:absolute;left:110px;bottom:64px;transform:none;z-index:15}
+  /* 右半屏：棋盘居中 + 辅助数值覆盖层 */
+  #game{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:8px 0 8px 16px}
+  #gwrap{width:min(64vh,100%) !important;max-width:none;margin-bottom:0;transform:none;flex:0 0 auto}
+  #aux{position:absolute;inset:0}  /* aux 相对 #game 定位（#game position:relative 已有） */
+  /* Launcher 横屏：四难度卡一排 */
+  #launcher{margin-top:0;padding:0 12px}
+  .level-grid{grid-template-columns:repeat(4,1fr);max-width:none;gap:10px;width:100%}
+  .level-btn{padding:12px 8px;gap:4px}
+  .level-btn .lvl-grid{width:34px;height:34px;margin:2px 0}
+  .level-btn .lvl-name{font:700 12px/1.2 var(--font);letter-spacing:2px}
+  .level-btn .lvl-meta{font-size:9px}
+  .level-btn .lvl-desc{font-size:9px;max-width:120px;line-height:1.25}
+  .launch-sub{margin-bottom:12px;font-size:10px}
+  .launch-title{display:none}
+  #volPanel{left:0;right:auto}
+}
+
 .hide{display:none!important}
 </style>
 </head>
@@ -868,8 +900,14 @@ function updAux(){
   /* v2.1.3: helper digits scale with cell size again (looks better); the board
      width shrinks per-N so the scaled digits still fit inside the screen. */
   const vw=Math.min(document.documentElement.clientWidth,window.innerWidth||1e9);
-  const shrink={4:0.68,6:0.78,8:0.82,10:0.84}[N]||0.84;
-  $('gwrap').style.width=`min(${Math.round(shrink*100)}vw,360px)`;
+  if(window.matchMedia('(orientation:landscape)').matches){
+    /* v0.11.2 横屏：宽度交给 CSS media 规则 min(78vh,100%)——内联 vw 公式是竖屏专属，
+       会在横屏把棋盘钳到 360px 且压过样式表 */
+    $('gwrap').style.width='';
+  }else{
+    const shrink={4:0.68,6:0.78,8:0.82,10:0.84}[N]||0.84;
+    $('gwrap').style.width=`min(${Math.round(shrink*100)}vw,360px)`;
+  }
   const {cols,rows}=auxNumbers();
   const disp=v=>v===null?'':(v===-1?'0':String(v+1));   // raw v → displayed digit
   const sumd=v=>v===null?0:(v===-1?0:v+1);              // summand: empty-line min counts 0
