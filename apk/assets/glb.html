@@ -6384,6 +6384,13 @@
   }
 
   function loadGLB(arrayBuffer, modelKey, fromPicker) {
+    // v0.13.5: 切换模型不丢姿势——先按骨骼名快照当前姿势，载入后应用到同名骨骼
+    var carry = null;
+    if (bones.length) {
+      carry = {};
+      bones.forEach(function (b) { carry[b.name] = [b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w]; });
+      if (model) carry.__pos = [model.position.x, model.position.y, model.position.z];
+    }
     new THREE.GLTFLoader().parse(arrayBuffer, '', function (gltf) {
       clearModel();
       currentModelKey = modelKey || 'builtin';
@@ -6417,6 +6424,15 @@
 
       frameCamera();
       restorePose();
+      if (carry) {
+        var carried = 0;
+        bones.forEach(function (b) {
+          var q = carry[b.name];
+          if (q) { b.quaternion.set(q[0], q[1], q[2], q[3]); carried++; }
+        });
+        if (carry.__pos && model) model.position.set(carry.__pos[0], carry.__pos[1], carry.__pos[2]);
+        if (carried) savePose(); // 传递的姿势落到新模型存档，冷启动一致
+      }
       setMode('pose');
       elHint.textContent = '点关节球选中骨骼,拖圆环旋转;点空白处取消选中';
       selectBone(bones[0]);
