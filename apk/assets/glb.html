@@ -6259,6 +6259,7 @@
   var tcDragEndAt = 0;
   var saveTimer = null;
   var LIB_KEY = 'poser_lib_v1';
+  var LAST_KEY = 'poser_last_v1';
   var currentModelKey = 'builtin';
   function poseKey() { return 'poser_pose_' + currentModelKey; }
 
@@ -6330,10 +6331,25 @@
     onResize();
 
     var builtins = getBuiltins();
-    if (builtins.length) {
-      loadGLB(b64ToArrayBuffer(builtins[0].b64), builtins[0].key, false);
-    } else {
-      elHint.textContent = '点「添加模型」选择一个 .glb 文件';
+    // v0.13.4: 冷启动恢复上次模型（姿势由 loadGLB→restorePose 按模型键自动恢复）
+    var lastEntry = null;
+    try { lastEntry = JSON.parse(localStorage.getItem(LAST_KEY)) || null; } catch (e) {}
+    var restoredLast = false;
+    if (lastEntry && lastEntry.key) {
+      var libArr = loadLib();
+      var libHit = null;
+      for (var li = 0; li < libArr.length; li++) if (libArr[li].name === lastEntry.key) { libHit = libArr[li]; break; }
+      if (libHit) { loadGLB(b64ToArrayBuffer(libHit.b64), libHit.name, false); restoredLast = true; }
+      else {
+        for (var lj = 0; lj < builtins.length; lj++) if (builtins[lj].key === lastEntry.key) { loadGLB(b64ToArrayBuffer(builtins[lj].b64), builtins[lj].key, false); restoredLast = true; break; }
+      }
+    }
+    if (!restoredLast) {
+      if (builtins.length) {
+        loadGLB(b64ToArrayBuffer(builtins[0].b64), builtins[0].key, false);
+      } else {
+        elHint.textContent = '点「添加模型」选择一个 .glb 文件';
+      }
     }
 
     animate();
@@ -6371,6 +6387,7 @@
     new THREE.GLTFLoader().parse(arrayBuffer, '', function (gltf) {
       clearModel();
       currentModelKey = modelKey || 'builtin';
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ key: currentModelKey })); } catch (e) {}
       model = gltf.scene;
       scene.add(model);
       model.traverse(function (o) {
