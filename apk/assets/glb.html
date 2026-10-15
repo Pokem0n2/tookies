@@ -6422,7 +6422,6 @@
         boneSpheres.push(s);
       });
 
-      frameCamera();
       restorePose();
       if (carry) {
         var carried = 0;
@@ -6432,6 +6431,10 @@
         });
         if (carry.__pos && model) model.position.set(carry.__pos[0], carry.__pos[1], carry.__pos[2]);
         if (carried) savePose(); // 传递的姿势落到新模型存档，冷启动一致
+        // v0.13.6: 切换模型不重置视角——保留用户当前相机（frameCamera 在切换时跳过，
+        // 否则用户转过的角度/缩放被默认取景覆盖，即"替换后视角变了"）
+      } else {
+        frameCamera(); // 冷启动/首次载入：姿势+位置恢复"后"再取景（原顺序在恢复前，移动过的模型取景偏位）
       }
       setMode('pose');
       elHint.textContent = '点关节球选中骨骼,拖圆环旋转;点空白处取消选中';
