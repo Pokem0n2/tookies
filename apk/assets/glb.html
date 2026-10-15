@@ -6260,6 +6260,7 @@
   var saveTimer = null;
   var LIB_KEY = 'poser_lib_v1';
   var LAST_KEY = 'poser_last_v1';
+  var pendingPoseKey = null; // v0.13.7: 冷启动库随机回退时,待传递姿势存档的旧模型 key
   var currentModelKey = 'builtin';
   function poseKey() { return 'poser_pose_' + currentModelKey; }
 
@@ -6334,9 +6335,9 @@
     // v0.13.4: 冷启动恢复上次模型（姿势由 loadGLB→restorePose 按模型键自动恢复）
     var lastEntry = null;
     try { lastEntry = JSON.parse(localStorage.getItem(LAST_KEY)) || null; } catch (e) {}
+    var libArr = loadLib(); // v0.13.7: 提到块外——下方库随机回退分支也使用(原在 if 内,var 提升致 undefined.length)
     var restoredLast = false;
     if (lastEntry && lastEntry.key) {
-      var libArr = loadLib();
       var libHit = null;
       for (var li = 0; li < libArr.length; li++) if (libArr[li].name === lastEntry.key) { libHit = libArr[li]; break; }
       if (libHit) { loadGLB(b64ToArrayBuffer(libHit.b64), libHit.name, false); restoredLast = true; }
@@ -6345,7 +6346,13 @@
       }
     }
     if (!restoredLast) {
-      if (builtins.length) {
+      if (libArr.length) {
+        // v0.13.7: 库非空必有模型看——随机载入一个;若 LAST_KEY 因模型被删而失效,
+        // 把关闭前模型的姿势存档按骨骼名带到随机模型(与切换模型同规则)
+        if (lastEntry && lastEntry.key) pendingPoseKey = lastEntry.key;
+        var pick = libArr[Math.floor(Math.random() * libArr.length)];
+        loadGLB(b64ToArrayBuffer(pick.b64), pick.name, false);
+      } else if (builtins.length) {
         loadGLB(b64ToArrayBuffer(builtins[0].b64), builtins[0].key, false);
       } else {
         elHint.textContent = '点「添加模型」选择一个 .glb 文件';
@@ -6434,6 +6441,23 @@
         // v0.13.6: 切换模型不重置视角——保留用户当前相机（frameCamera 在切换时跳过，
         // 否则用户转过的角度/缩放被默认取景覆盖，即"替换后视角变了"）
       } else {
+        if (pendingPoseKey) {
+          // v0.13.7: 库随机回退——被删模型关闭前的姿势存档按骨骼名应用(异名保持默认)
+          try {
+            var praw = localStorage.getItem('poser_pose_' + pendingPoseKey);
+            if (praw) {
+              var pd = JSON.parse(praw);
+              var pcarried = 0;
+              bones.forEach(function (b) {
+                var pq = pd[b.name];
+                if (pq) { b.quaternion.set(pq[0], pq[1], pq[2], pq[3]); pcarried++; }
+              });
+              if (pd._pos && model) model.position.set(pd._pos[0], pd._pos[1], pd._pos[2]);
+              if (pcarried) savePose();
+            }
+          } catch (e) {}
+          pendingPoseKey = null;
+        }
         frameCamera(); // 冷启动/首次载入：姿势+位置恢复"后"再取景（原顺序在恢复前，移动过的模型取景偏位）
       }
       setMode('pose');
