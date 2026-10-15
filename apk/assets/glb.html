@@ -6261,6 +6261,13 @@
   var LIB_KEY = 'poser_lib_v1';
   var LAST_KEY = 'poser_last_v1';
   var pendingPoseKey = null; // v0.13.7: 冷启动库随机回退时,待传递姿势存档的旧模型 key
+  var CAM_KEY = 'poser_cam_v1'; // v0.13.8: 视角存档(跨模型,与切换不重置语义一致)
+  var camTimer = null;
+  function saveCam() {
+    if (!camera || !orbit) return;
+    try { localStorage.setItem(CAM_KEY, JSON.stringify({ p: [camera.position.x, camera.position.y, camera.position.z], t: [orbit.target.x, orbit.target.y, orbit.target.z] })); } catch (e) {}
+  }
+  function scheduleCamSave() { if (camTimer) clearTimeout(camTimer); camTimer = setTimeout(saveCam, 600); }
   var currentModelKey = 'builtin';
   function poseKey() { return 'poser_pose_' + currentModelKey; }
 
@@ -6302,6 +6309,9 @@
     scene.add(grid);
 
     orbit = new THREE.OrbitControls(camera, renderer.domElement);
+      orbit.addEventListener('change', scheduleCamSave);
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') saveCam(); });
+      window.addEventListener('pagehide', saveCam);
     orbit.target.set(0, 0.9, 0);
     orbit.enableDamping = true;
 
@@ -6458,7 +6468,15 @@
           } catch (e) {}
           pendingPoseKey = null;
         }
-        frameCamera(); // 冷启动/首次载入：姿势+位置恢复"后"再取景（原顺序在恢复前，移动过的模型取景偏位）
+        var camRaw = null;
+        try { camRaw = JSON.parse(localStorage.getItem(CAM_KEY)) || null; } catch (e) {}
+        if (camRaw && camRaw.p && camRaw.t) {
+          camera.position.set(camRaw.p[0], camRaw.p[1], camRaw.p[2]);
+          orbit.target.set(camRaw.t[0], camRaw.t[1], camRaw.t[2]);
+          orbit.update();
+        } else {
+          frameCamera(); // 无视角档:姿势+位置恢复"后"再自动取景
+        }
       }
       setMode('pose');
       elHint.textContent = '点关节球选中骨骼,拖圆环旋转;点空白处取消选中';
