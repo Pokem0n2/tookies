@@ -247,10 +247,7 @@
     });
   });
   imeInput.addEventListener('input', function (e) {
-    if (e.inputType === 'deleteContentBackward') {
-      pInf.textContent = '"Backspace"'; pInfCode.textContent = 'Backspace'; pInfKc.textContent = '8';
-      setBig('Backspace', '推断');
-    } else if (e.inputType === 'insertText' && e.data) {
+    if (e.inputType === 'insertText' && e.data) {
       pInf.textContent = JSON.stringify(e.data);
       pInfCode.textContent = inferCode(e.data);
       pInfKc.textContent = String(inferKc(e.data));
@@ -265,7 +262,14 @@
       if (inForm(e.target)) {
         // v0.13.10: 表单内按键分流——搜索框等完全不进检测区且不拦截(修 Backspace 被吞);
         // 仅检测区唤起的 ime-input 进检测(不 preventDefault, 保输入法组合默认行为)
-        if (e.target.id === 'ime-input') showEv(t, e);
+        if (e.target.id === 'ime-input') {
+          showEv(t, e);
+          // v0.13.13: 标准键(非229/Unidentified,如软键盘"前往"=Enter/删除=Backspace)
+          // 按下时旧推断值即失效——清空推断行,避免滞留上一次上屏的值
+          if (t === 'keydown' && e.keyCode !== 229 && e.key !== 'Unidentified') {
+            pInf.textContent = '—'; pInfCode.textContent = '—'; pInfKc.textContent = '—';
+          }
+        }
         return;
       }
       if (t === 'keydown' && NAV[e.key]) e.preventDefault();
