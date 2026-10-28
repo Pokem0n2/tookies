@@ -39,7 +39,7 @@
   table.props td:last-child { word-break:break-all; }
   table.props tr.dim td { color:#aaa; }
   .evt-badge { font:600 10px/1 "Source Code Pro",monospace; padding:3px 6px; border-radius:4px; color:#fff; margin-right:6px; }
-  .evt-keydown { background:#0c7abf; } .evt-keyup { background:#9aa0a6; } .evt-keypress { background:#0a9a8a; }
+  .evt-keydown { background:#0c7abf; } .evt-keyup { background:#9aa0a6; } .evt-keypress { background:#0a9a8a; } .evt-composition { background:#b8860b; } .evt-input { background:#6a5acd; }
 
   /* 事件日志 */
   #logcard { background:#fff; border:1px solid #e3dede; border-radius:10px; padding:10px 12px; }
@@ -72,7 +72,7 @@
 <div class="wrap">
 
   <h2>按键检测</h2>
-  <div class="desc">接入键盘后按任意键，实时显示 JavaScript KeyboardEvent 的属性。外接键盘/软键盘均可测。</div>
+  <div class="desc">按任意键实时显示 KeyboardEvent 属性。软键盘(IME)标准上报 229/Unidentified，实际按键由组合/输入事件推断（标"推断"行）。</div>
   <div id="press">
     <input id="ime-input" autocomplete="off" autocorrect="off" autocapitalize="off" aria-hidden="true"
       style="position:absolute;opacity:0;width:1px;height:1px;border:0;padding:0;">
@@ -93,6 +93,9 @@
       <tr><td>e.location</td><td id="p-loc">—</td></tr>
       <tr><td>e.repeat</td><td id="p-rep">—</td></tr>
       <tr><td>e.isComposing</td><td id="p-comp">—</td></tr>
+      <tr><td>组合中文本</td><td id="p-composition">—</td></tr>
+      <tr><td>推断 key</td><td id="p-infer">—</td></tr>
+      <tr><td>推断 keyCode</td><td id="p-inferkc">—</td></tr>
     </tbody></table>
   </div>
 
@@ -198,6 +201,56 @@
   }
   document.getElementById('btn-clear').addEventListener('click', function () {
     logItems = []; log.innerHTML = '<li class="empty">尚无事件——按任意键开始</li>';
+  });
+
+  // v0.13.11: IME 推断——软键盘 keydown 报 229/Unidentified(W3C 标准),
+  // 真实按键在 composition/input 事件里(keyjs 原版"infer"思路的实现)
+  var pComp = document.getElementById('p-composition');
+  var pInf = document.getElementById('p-infer');
+  var pInfKc = document.getElementById('p-inferkc');
+  var compTimer = null;
+  // ASCII 可打印字符 → 历史 keyCode 反查(字母数字=charCode;符号专表)
+  var SYM = { ' ': 32, ';': 186, '=': 187, ',': 188, '-': 189, '.': 190, '/': 191, '`': 192, '[': 219, '\\': 220, ']': 221, "'": 222 };
+  function inferKc(str) {
+    if (!str || str.length !== 1) return '—';
+    var c = str.charAt(0), code = str.charCodeAt(0);
+    if (code >= 97 && code <= 122) return code - 32;          // a-z → 65-90
+    if ((code >= 65 && code <= 90) || (code >= 48 && code <= 57)) return code;
+    if (SYM.hasOwnProperty(c)) return SYM[c];
+    return '—';                                                 // 中文等多字节无历史 keyCode
+  }
+  function setBig(text, tag) {
+    bigkey.textContent = text;
+    bigkey.classList.add('flash');
+    clearTimeout(bigkey._t);
+    bigkey._t = setTimeout(function () { bigkey.classList.remove('flash'); }, 220);
+    if (tag) addLog('input', { key: text, code: tag });
+  }
+  ['compositionstart', 'compositionupdate', 'compositionend'].forEach(function (t) {
+    imeInput.addEventListener(t, function (e) {
+      if (e.data) {
+        pComp.textContent = JSON.stringify(e.data);
+        setBig(e.data, null);
+        addLog('composition', { key: e.data, code: t.replace('composition', 'comp-') });
+        if (t === 'compositionend') {
+          // 上屏文本即最终组合结果——同步推断行(真实 IME 的 input insertText 随后到达,幂等)
+          pInf.textContent = JSON.stringify(e.data);
+          pInfKc.textContent = String(inferKc(e.data));
+          clearTimeout(compTimer);
+          compTimer = setTimeout(function () { pComp.textContent = '—'; }, 800);
+        }
+      }
+    });
+  });
+  imeInput.addEventListener('input', function (e) {
+    if (e.inputType === 'deleteContentBackward') {
+      pInf.textContent = '"Backspace"'; pInfKc.textContent = '8';
+      setBig('Backspace', '推断');
+    } else if (e.inputType === 'insertText' && e.data) {
+      pInf.textContent = JSON.stringify(e.data);
+      pInfKc.textContent = String(inferKc(e.data));
+      setBig(e.data.length > 12 ? e.data.slice(0, 12) + '…' : e.data, '推断');
+    }
   });
 
   var NAV = { Backspace: 1, Tab: 1, ' ': 1, PageUp: 1, PageDown: 1, End: 1, Home: 1, ArrowLeft: 1, ArrowUp: 1, ArrowRight: 1, ArrowDown: 1 };
