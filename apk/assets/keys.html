@@ -72,7 +72,7 @@
 <div class="wrap">
 
   <h2>按键检测</h2>
-  <div class="desc">按任意键实时显示 KeyboardEvent 属性。软键盘(IME)标准上报 229/Unidentified，实际按键由组合/输入事件推断（标"推断"行）。</div>
+  <div class="desc">按任意键实时显示 KeyboardEvent 属性。</div>
   <div id="press">
     <input id="ime-input" autocomplete="off" autocorrect="off" autocapitalize="off" aria-hidden="true"
       style="position:absolute;opacity:0;width:1px;height:1px;border:0;padding:0;">
@@ -93,8 +93,8 @@
       <tr><td>e.location</td><td id="p-loc">—</td></tr>
       <tr><td>e.repeat</td><td id="p-rep">—</td></tr>
       <tr><td>e.isComposing</td><td id="p-comp">—</td></tr>
-      <tr><td>组合中文本</td><td id="p-composition">—</td></tr>
       <tr><td>推断 key</td><td id="p-infer">—</td></tr>
+      <tr><td>推断 code</td><td id="p-infercode">—</td></tr>
       <tr><td>推断 keyCode</td><td id="p-inferkc">—</td></tr>
     </tbody></table>
   </div>
@@ -106,10 +106,9 @@
   </div>
 
   <h2>keyCode 参考表</h2>
-  <div class="desc">0~255 中有实际含义的 which / keyCode 值（已废弃属性，仅供排查旧代码）。点击行复制数值。</div>
+  <div class="desc">点击行复制数值。</div>
   <div id="kctool"><input id="kcsearch" placeholder="搜索键名或数值，如 Enter / 65" inputmode="search"></div>
   <table id="kctable"><thead><tr><th>keyCode</th><th>键</th></tr></thead><tbody id="kcbody"></tbody></table>
-  <div class="hint">移动输入法（IME）下标准规定 keyCode=229、key="Unidentified"，表中未列。</div>
 </div>
 <div id="toast"></div>
 <script>
@@ -205,12 +204,12 @@
 
   // v0.13.11: IME 推断——软键盘 keydown 报 229/Unidentified(W3C 标准),
   // 真实按键在 composition/input 事件里(keyjs 原版"infer"思路的实现)
-  var pComp = document.getElementById('p-composition');
   var pInf = document.getElementById('p-infer');
+  var pInfCode = document.getElementById('p-infercode');
   var pInfKc = document.getElementById('p-inferkc');
-  var compTimer = null;
   // ASCII 可打印字符 → 历史 keyCode 反查(字母数字=charCode;符号专表)
   var SYM = { ' ': 32, ';': 186, '=': 187, ',': 188, '-': 189, '.': 190, '/': 191, '`': 192, '[': 219, '\\': 220, ']': 221, "'": 222 };
+  var CODE = { ' ': 'Space', ';': 'Semicolon', '=': 'Equal', ',': 'Comma', '-': 'Minus', '.': 'Period', '/': 'Slash', '`': 'Backquote', '[': 'BracketLeft', '\\': 'Backslash', ']': 'BracketRight', "'": 'Quote' };
   function inferKc(str) {
     if (!str || str.length !== 1) return '—';
     var c = str.charAt(0), code = str.charCodeAt(0);
@@ -218,6 +217,13 @@
     if ((code >= 65 && code <= 90) || (code >= 48 && code <= 57)) return code;
     if (SYM.hasOwnProperty(c)) return SYM[c];
     return '—';                                                 // 中文等多字节无历史 keyCode
+  }
+  function inferCode(str) {
+    if (!str || str.length !== 1) return '—';
+    var c = str.charAt(0), code = str.charCodeAt(0);
+    if (code >= 97 && code <= 122 || code >= 65 && code <= 90) return 'Key' + c.toUpperCase();
+    if (code >= 48 && code <= 57) return 'Digit' + c;
+    return CODE.hasOwnProperty(c) ? CODE[c] : '—';
   }
   function setBig(text, tag) {
     bigkey.textContent = text;
@@ -229,25 +235,24 @@
   ['compositionstart', 'compositionupdate', 'compositionend'].forEach(function (t) {
     imeInput.addEventListener(t, function (e) {
       if (e.data) {
-        pComp.textContent = JSON.stringify(e.data);
         setBig(e.data, null);
         addLog('composition', { key: e.data, code: t.replace('composition', 'comp-') });
         if (t === 'compositionend') {
           // 上屏文本即最终组合结果——同步推断行(真实 IME 的 input insertText 随后到达,幂等)
           pInf.textContent = JSON.stringify(e.data);
+          pInfCode.textContent = inferCode(e.data);
           pInfKc.textContent = String(inferKc(e.data));
-          clearTimeout(compTimer);
-          compTimer = setTimeout(function () { pComp.textContent = '—'; }, 800);
         }
       }
     });
   });
   imeInput.addEventListener('input', function (e) {
     if (e.inputType === 'deleteContentBackward') {
-      pInf.textContent = '"Backspace"'; pInfKc.textContent = '8';
+      pInf.textContent = '"Backspace"'; pInfCode.textContent = 'Backspace'; pInfKc.textContent = '8';
       setBig('Backspace', '推断');
     } else if (e.inputType === 'insertText' && e.data) {
       pInf.textContent = JSON.stringify(e.data);
+      pInfCode.textContent = inferCode(e.data);
       pInfKc.textContent = String(inferKc(e.data));
       setBig(e.data.length > 12 ? e.data.slice(0, 12) + '…' : e.data, '推断');
     }
