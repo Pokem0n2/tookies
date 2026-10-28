@@ -88,11 +88,6 @@
       <tr><td>e.key</td><td id="p-key">—</td></tr>
       <tr><td>e.code</td><td id="p-code">—</td></tr>
       <tr><td>e.keyCode</td><td id="p-kc">—</td></tr>
-      <tr><td>e.which</td><td id="p-which">—</td></tr>
-      <tr><td>e.charCode</td><td id="p-cc">—</td></tr>
-      <tr><td>e.location</td><td id="p-loc">—</td></tr>
-      <tr><td>e.repeat</td><td id="p-rep">—</td></tr>
-      <tr><td>e.isComposing</td><td id="p-comp">—</td></tr>
       <tr><td>推断 key</td><td id="p-infer">—</td></tr>
       <tr><td>推断 code</td><td id="p-infercode">—</td></tr>
       <tr><td>推断 keyCode</td><td id="p-inferkc">—</td></tr>
@@ -162,9 +157,8 @@
   });
 
   var bigkey = document.getElementById('bigkey');
-  var P = { evt: g('p-evt'), key: g('p-key'), code: g('p-code'), kc: g('p-kc'), which: g('p-which'), cc: g('p-cc'), loc: g('p-loc'), rep: g('p-rep'), comp: g('p-comp') };
+  var P = { evt: g('p-evt'), key: g('p-key'), code: g('p-code'), kc: g('p-kc') };
   function g(id) { return document.getElementById(id); }
-  var LOC = ['标准(0)', '左(1)', '右(2)', '小键盘(3)'];
   var log = document.getElementById('log'), logItems = [];
 
   function showEv(type, e) {
@@ -172,11 +166,6 @@
     P.key.textContent = JSON.stringify(e.key);
     P.code.textContent = e.code || '—';
     P.kc.textContent = e.keyCode;
-    P.which.textContent = (e.which !== undefined && e.which !== 0) ? e.which : (e.keyCode || '—');
-    P.cc.textContent = (type === 'keypress') ? (e.charCode || e.keyCode || '—') : (e.charCode || '—');
-    P.loc.textContent = LOC[e.location] || e.location;
-    P.rep.textContent = !!e.repeat;
-    P.comp.textContent = !!e.isComposing;
     document.getElementById('m-shift').classList.toggle('on', e.shiftKey);
     document.getElementById('m-ctrl').classList.toggle('on', e.ctrlKey);
     document.getElementById('m-meta').classList.toggle('on', e.metaKey);
