@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>敲键盘</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { background:snow; color:#000; font:16px/1.5 -apple-system,"Noto Sans SC","Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:640px; margin:0 auto; padding:0 12px 40px; }
+  #topbar { position:sticky; top:0; z-index:10; background:rgba(255,250,250,.92); backdrop-filter:blur(6px);
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid #e8e2e2; }
+  #tk-back { width:36px; height:36px; border:1px solid #bbb; border-radius:8px; background:#fff; color:#000;
+    font-size:20px; line-height:1; cursor:pointer; box-shadow:0 2px 0 -1px #ccc,0 3px 0 -2px #ddd; }
+  #tk-back:active { transform:translateY(1px); box-shadow:0 1px 0 -1px #ccc; }
+  #topbar h1 { font-size:18px; font-weight:600; }
+  h2 { font-size:13px; font-weight:600; color:#0c7abf; margin:18px 0 8px; letter-spacing:.5px; }
+  .desc { font-size:12px; color:#666; margin-bottom:8px; }
+
+  /* 键帽（复刻 keyjs.dev 层叠阴影风格） */
+  .kbd { font:500 12px/15px "Source Code Pro",Consolas,Inconsolata,"Droid Sans Mono",Monaco,monospace;
+    display:inline-block; padding:4px 8px; border-radius:4px; background:#fff; border:1px solid #bbb; color:#000;
+    box-shadow:inset 0 0 0 transparent, 0 2px 0 -1px #ccc, 0 4px 0 -2px #ddd, 0 4px 0 0 #999, 0 6px 12px rgba(0,0,0,.15);
+    vertical-align:middle; user-select:none; }
+  .kbd.on { background:rgba(0,0,255,.125); border-color:#00f; color:#00f; transform:translateY(2px);
+    box-shadow:0 1px 0 -1px #ccc, 0 2px 0 -2px #ddd, 0 2px 0 0 #999; }
+
+  /* 按键检测区 */
+  #press { background:#fff; border:1px solid #e3dede; border-radius:10px; padding:16px 12px; text-align:center; }
+  #bigkey { font-size:34px; line-height:1; padding:18px 26px; min-width:88px; min-height:76px; display:inline-flex;
+    align-items:center; justify-content:center; word-break:break-all; max-width:100%; }
+  #bigkey.flash { background:rgba(0,0,255,.125); border-color:#00f; color:#00f; transform:translateY(3px);
+    box-shadow:0 1px 0 -1px #ccc, 0 1px 0 0 #999; }
+  #mods { margin-top:14px; display:flex; justify-content:center; gap:10px; font-size:16px; }
+  #mods .kbd { width:44px; text-align:center; }
+  table.props { width:100%; border-collapse:collapse; margin-top:14px; font:12px/1.5 "Source Code Pro",Consolas,"Droid Sans Mono",monospace; }
+  table.props td { border-top:1px solid #eee; padding:6px 4px; text-align:left; }
+  table.props td:first-child { color:#0c7abf; width:34%; }
+  table.props td:last-child { word-break:break-all; }
+  table.props tr.dim td { color:#aaa; }
+  .evt-badge { font:600 10px/1 "Source Code Pro",monospace; padding:3px 6px; border-radius:4px; color:#fff; margin-right:6px; }
+  .evt-keydown { background:#0c7abf; } .evt-keyup { background:#9aa0a6; } .evt-keypress { background:#0a9a8a; }
+
+  /* 事件日志 */
+  #logcard { background:#fff; border:1px solid #e3dede; border-radius:10px; padding:10px 12px; }
+  #log { list-style:none; font:12px/1.7 "Source Code Pro",Consolas,"Droid Sans Mono",monospace; }
+  #log li { border-bottom:1px dashed #eee; padding:4px 0; display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+  #log li:last-child { border-bottom:none; }
+  #log .t { color:#aaa; margin-left:auto; font-size:10px; }
+  #log .empty { color:#aaa; text-align:center; padding:12px 0; }
+  #btn-clear { margin-top:8px; border:1px solid #bbb; background:#fff; border-radius:8px; padding:7px 14px;
+    font-size:13px; color:#000; box-shadow:0 2px 0 -1px #ccc,0 3px 0 -2px #ddd; }
+  #btn-clear:active { transform:translateY(1px); }
+
+  /* keyCode 参考表 */
+  #kctool { display:flex; gap:8px; margin-bottom:8px; }
+  #kcsearch { flex:1; border:1px solid #bbb; border-radius:8px; padding:9px 12px; font-size:14px; background:#fff; outline:none; }
+  #kcsearch:focus { border-color:#0c7abf; }
+  #kctable { width:100%; border-collapse:collapse; background:#fff; border:1px solid #e3dede; border-radius:10px; overflow:hidden; font:12px/1.5 "Source Code Pro",Consolas,"Droid Sans Mono",monospace; }
+  #kctable th { background:#f6f1f1; text-align:left; padding:7px 10px; font-size:11px; color:#0c7abf; }
+  #kctable td { border-top:1px solid #f0eaea; padding:7px 10px; cursor:pointer; }
+  #kctable td:first-child { color:#0c7abf; width:64px; }
+  #kctable tr:active td { background:rgba(0,0,255,.06); }
+  .hint { font-size:11px; color:#999; margin-top:6px; }
+  #toast { position:fixed; left:50%; bottom:64px; transform:translateX(-50%) translateY(20px); background:rgba(0,0,0,.75);
+    color:#fff; font-size:13px; padding:8px 16px; border-radius:20px; opacity:0; transition:all .25s; pointer-events:none; z-index:99; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="topbar"><button id="tk-back" aria-label="返回">‹</button><h1>敲键盘</h1></div>
+<div class="wrap">
+
+  <h2>按键检测</h2>
+  <div class="desc">接入键盘后按任意键，实时显示 JavaScript KeyboardEvent 的属性。外接键盘/软键盘均可测。</div>
+  <div id="press">
+    <div id="bigkey" class="kbd">按任意键</div>
+    <div id="mods">
+      <span class="kbd" id="m-shift" title="Shift">⇧</span>
+      <span class="kbd" id="m-ctrl" title="Ctrl">⌃</span>
+      <span class="kbd" id="m-meta" title="Meta">⌘</span>
+      <span class="kbd" id="m-alt" title="Alt">⌥</span>
+    </div>
+    <table class="props"><tbody id="props">
+      <tr><td>event</td><td id="p-evt">—</td></tr>
+      <tr><td>e.key</td><td id="p-key">—</td></tr>
+      <tr><td>e.code</td><td id="p-code">—</td></tr>
+      <tr><td>e.keyCode</td><td id="p-kc">—</td></tr>
+      <tr><td>e.which</td><td id="p-which">—</td></tr>
+      <tr><td>e.charCode</td><td id="p-cc">—</td></tr>
+      <tr><td>e.location</td><td id="p-loc">—</td></tr>
+      <tr><td>e.repeat</td><td id="p-rep">—</td></tr>
+      <tr><td>e.isComposing</td><td id="p-comp">—</td></tr>
+    </tbody></table>
+  </div>
+
+  <h2>事件日志</h2>
+  <div id="logcard">
+    <ul id="log"><li class="empty">尚无事件——按任意键开始</li></ul>
+    <button id="btn-clear">清空日志</button>
+  </div>
+
+  <h2>keyCode 参考表</h2>
+  <div class="desc">0~255 中有实际含义的 which / keyCode 值（已废弃属性，仅供排查旧代码）。点击行复制数值。</div>
+  <div id="kctool"><input id="kcsearch" placeholder="搜索键名或数值，如 Enter / 65" inputmode="search"></div>
+  <table id="kctable"><thead><tr><th>keyCode</th><th>键</th></tr></thead><tbody id="kcbody"></tbody></table>
+  <div class="hint">移动输入法（IME）下标准规定 keyCode=229、key="Unidentified"，表中未列。</div>
+</div>
+<div id="toast"></div>
+<script>
+(function () {
+  document.getElementById('tk-back').addEventListener('click', function () { location.href = 'index.html'; });
+
+  var KC = [[8,'Backspace 退格'],[9,'Tab'],[12,'Clear'],[13,'Enter 回车'],[16,'Shift'],[17,'Control'],[18,'Alt'],[19,'Pause/Break'],[20,'Caps Lock'],[27,'Escape'],[32,'Space 空格'],[33,'Page Up'],[34,'Page Down'],[35,'End'],[36,'Home'],[37,'Left Arrow ←'],[38,'Up Arrow ↑'],[39,'Right Arrow →'],[40,'Down Arrow ↓'],[41,'Select'],[42,'Print'],[43,'Execute'],[44,'Print Screen'],[45,'Insert'],[46,'Delete'],[47,'Help'],[48,'0'],[49,'1'],[50,'2'],[51,'3'],[52,'4'],[53,'5'],[54,'6'],[55,'7'],[56,'8'],[57,'9'],[65,'A'],[66,'B'],[67,'C'],[68,'D'],[69,'E'],[70,'F'],[71,'G'],[72,'H'],[73,'I'],[74,'J'],[75,'K'],[76,'L'],[77,'M'],[78,'N'],[79,'O'],[80,'P'],[81,'Q'],[82,'R'],[83,'S'],[84,'T'],[85,'U'],[86,'V'],[87,'W'],[88,'X'],[89,'Y'],[90,'Z'],[91,'Left Meta / OS 左徽标'],[92,'Right Meta / OS 右徽标'],[93,'Context Menu 菜单'],[96,'Numpad 0'],[97,'Numpad 1'],[98,'Numpad 2'],[99,'Numpad 3'],[100,'Numpad 4'],[101,'Numpad 5'],[102,'Numpad 6'],[103,'Numpad 7'],[104,'Numpad 8'],[105,'Numpad 9'],[106,'Multiply *'],[107,'Add +'],[108,'Keypad Enter'],[109,'Subtract -'],[110,'Decimal .'],[111,'Divide /'],[112,'F1'],[113,'F2'],[114,'F3'],[115,'F4'],[116,'F5'],[117,'F6'],[118,'F7'],[119,'F8'],[120,'F9'],[121,'F10'],[122,'F11'],[123,'F12'],[124,'F13'],[125,'F14'],[126,'F15'],[127,'F16'],[128,'F17'],[129,'F18'],[130,'F19'],[131,'F20'],[132,'F21'],[133,'F22'],[134,'F23'],[135,'F24'],[144,'Num Lock'],[145,'Scroll Lock'],[166,'Page Back 后退'],[167,'Page Forward 前进'],[168,'Reload 刷新'],[174,'Volume Down 音量-'],[175,'Volume Up 音量+'],[186,'Semi-colon ;'],[187,'Equal ='],[188,'Comma ,'],[189,'Dash -'],[190,'Period .'],[191,'Forward Slash /'],[192,'Grave Accent `'],[219,'Open Bracket ['],[220,'Back Slash \\'],[221,'Close Bracket ]'],[222,"Single Quote '"]];
+  var kcbody = document.getElementById('kcbody');
+  function renderKC(q) {
+    q = (q || '').trim().toLowerCase();
+    var html = '';
+    KC.forEach(function (r) {
+      if (!q || String(r[0]).indexOf(q) >= 0 || r[1].toLowerCase().indexOf(q) >= 0) {
+        html += '<tr data-v="' + r[0] + '"><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+      }
+    });
+    kcbody.innerHTML = html || '<tr><td colspan="2" style="color:#aaa">无匹配</td></tr>';
+  }
+  renderKC('');
+  document.getElementById('kcsearch').addEventListener('input', function () { renderKC(this.value); });
+
+  var toastEl = document.getElementById('toast'), toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1400);
+  }
+  function copyText(t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(function () { toast('已复制 ' + t); }, function () { fallbackCopy(t); });
+    } else fallbackCopy(t);
+  }
+  function fallbackCopy(t) {
+    var ta = document.createElement('textarea');
+    ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    if (ok) toast('已复制 ' + t);
+    else if (window.Android && Android.toast) { Android.toast('已复制 ' + t); }
+    else toast('复制失败');
+  }
+  kcbody.addEventListener('click', function (ev) {
+    var tr = ev.target.closest('tr');
+    if (tr && tr.dataset.v) copyText(tr.dataset.v);
+  });
+
+  var bigkey = document.getElementById('bigkey');
+  var P = { evt: g('p-evt'), key: g('p-key'), code: g('p-code'), kc: g('p-kc'), which: g('p-which'), cc: g('p-cc'), loc: g('p-loc'), rep: g('p-rep'), comp: g('p-comp') };
+  function g(id) { return document.getElementById(id); }
+  var LOC = ['标准(0)', '左(1)', '右(2)', '小键盘(3)'];
+  var log = document.getElementById('log'), logItems = [];
+
+  function showEv(type, e) {
+    P.evt.textContent = type;
+    P.key.textContent = JSON.stringify(e.key);
+    P.code.textContent = e.code || '—';
+    P.kc.textContent = e.keyCode;
+    P.which.textContent = (e.which !== undefined && e.which !== 0) ? e.which : (e.keyCode || '—');
+    P.cc.textContent = (type === 'keypress') ? (e.charCode || e.keyCode || '—') : (e.charCode || '—');
+    P.loc.textContent = LOC[e.location] || e.location;
+    P.rep.textContent = !!e.repeat;
+    P.comp.textContent = !!e.isComposing;
+    document.getElementById('m-shift').classList.toggle('on', e.shiftKey);
+    document.getElementById('m-ctrl').classList.toggle('on', e.ctrlKey);
+    document.getElementById('m-meta').classList.toggle('on', e.metaKey);
+    document.getElementById('m-alt').classList.toggle('on', e.altKey);
+    if (type === 'keydown') {
+      bigkey.textContent = (e.key && e.key.length > 12) ? e.key.slice(0, 12) + '…' : (e.key || '—');
+      bigkey.classList.add('flash');
+      clearTimeout(bigkey._t);
+      bigkey._t = setTimeout(function () { bigkey.classList.remove('flash'); }, 220);
+    }
+    addLog(type, e);
+  }
+  function addLog(type, e) {
+    var now = new Date();
+    var hh = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2) + ':' + ('0' + now.getSeconds()).slice(-2);
+    var disp = (e.key && e.key.length > 14) ? e.key.slice(0, 14) + '…' : (e.key || '—');
+    logItems.unshift('<li><span class="evt-badge evt-' + type + '">' + type + '</span><span class="kbd">' +
+      disp.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span><span>' + (e.code || '') + '</span><span class="t">' + hh + '</span></li>');
+    if (logItems.length > 12) logItems.pop();
+    log.innerHTML = logItems.join('');
+  }
+  document.getElementById('btn-clear').addEventListener('click', function () {
+    logItems = []; log.innerHTML = '<li class="empty">尚无事件——按任意键开始</li>';
+  });
+
+  var NAV = { Backspace: 1, Tab: 1, ' ': 1, PageUp: 1, PageDown: 1, End: 1, Home: 1, ArrowLeft: 1, ArrowUp: 1, ArrowRight: 1, ArrowDown: 1 };
+  ['keydown', 'keyup', 'keypress'].forEach(function (t) {
+    document.addEventListener(t, function (e) {
+      if (t === 'keydown' && NAV[e.key]) e.preventDefault();
+      if (e.key && e.key.indexOf('F') === 0 && /^F\d+$/.test(e.key)) e.preventDefault();
+      showEv(t, e);
+    }, true);
+  });
+})();
+</script>
+</body>
+</html>
