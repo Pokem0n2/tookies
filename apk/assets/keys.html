@@ -104,6 +104,7 @@
   <div class="desc">点击行复制数值。</div>
   <div id="kctool"><input id="kcsearch" placeholder="搜索键名或数值，如 Enter / 65" inputmode="search"></div>
   <table id="kctable"><thead><tr><th>keyCode</th><th>键</th></tr></thead><tbody id="kcbody"></tbody></table>
+  <div class="hint">移动输入法（IME）下标准规定 keyCode=229、key="Unidentified"，表中未列。</div>
 </div>
 <div id="toast"></div>
 <script>
@@ -245,6 +246,7 @@
   });
 
   var NAV = { Backspace: 1, Tab: 1, ' ': 1, PageUp: 1, PageDown: 1, End: 1, Home: 1, ArrowLeft: 1, ArrowUp: 1, ArrowRight: 1, ArrowDown: 1 };
+  var KC2CODE = { Backspace: 'Backspace', Tab: 'Tab', Enter: 'Enter', Escape: 'Escape', ' ': 'Space', PageUp: 'PageUp', PageDown: 'PageDown', End: 'End', Home: 'Home', ArrowLeft: 'ArrowLeft', ArrowUp: 'ArrowUp', ArrowRight: 'ArrowRight', ArrowDown: 'ArrowDown', Insert: 'Insert', Delete: 'Delete' };
   function inForm(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
   ['keydown', 'keyup', 'keypress'].forEach(function (t) {
     document.addEventListener(t, function (e) {
@@ -257,6 +259,9 @@
           // 按下时旧推断值即失效——清空推断行,避免滞留上一次上屏的值
           if (t === 'keydown' && e.keyCode !== 229 && e.key !== 'Unidentified') {
             pInf.textContent = '—'; pInfCode.textContent = '—'; pInfKc.textContent = '—';
+            // v0.13.15: 安卓软键盘 keydown 不填 e.code(系统级,真实行为)——
+            // 可从 key 反查的导航键在推断 code 行补全,消除"key 有值 code 空"的割裂
+            if (!e.code && KC2CODE.hasOwnProperty(e.key)) pInfCode.textContent = KC2CODE[e.key];
           }
         }
         return;
