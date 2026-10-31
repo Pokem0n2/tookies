@@ -64,7 +64,7 @@
   .grp button:disabled { opacity: 0.35; cursor: default; }
   .th { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; }
   .th input[type="range"] { flex: 1 1 0; min-width: 0; width: auto; accent-color: var(--accent); } /* v0.14.6: basis auto→0,斩断 range 固有宽反馈(真机 bar 撑宽 545px 根因) */
-  .th .v { flex: 0 0 auto; min-width: 2.2em; text-align: right; color: var(--text); }
+  .th .v { flex: 0 0 auto; min-width: 2.2em; text-align: left; color: var(--text); } /* v0.14.8: right→left,数字紧贴滑杆右端,位数抖动由值框右侧吸收 */
   #stage { grid-row: 2; grid-column: 1; min-height: 0; display: flex; }
   #stage.hsplit { flex-direction: row; }
   #stage.vsplit { flex-direction: column; }
