@@ -90,14 +90,19 @@ Uri[] uris = null;
 if (resultCode == RESULT_OK && data != null) {
 // v0.14.1: 多选(相册勾选多张)返回 ClipData,getData() 为 null 被当"取消"→页面收不到图。
 // 解析顺序: ClipData 遍历(多选) → getData()(单选,GLB 添加模型路径行为不变)
+java.util.ArrayList<Uri> list = new java.util.ArrayList<Uri>();
 if (data.getClipData() != null) {
 android.content.ClipData cd = data.getClipData();
-int n = cd.getItemCount();
-uris = new Uri[n];
-for (int i = 0; i < n; i++) uris[i] = cd.getItemAt(i).getUri();
+for (int i = 0; i < cd.getItemCount(); i++) list.add(cd.getItemAt(i).getUri());
 } else if (data.getData() != null) {
-uris = new Uri[]{ data.getData() };
+list.add(data.getData());
 }
+// v0.14.13: 相册 ID 型 URI(content://media/.../1000015679)的 File.name 被 WebView 推断为
+// "ID+扩展名"(数字名),真实 DISPLAY_NAME 丢失(用户选下载/保存的图真名非数字时暴露)。
+// 图片类(<20MB)查真实 DISPLAY_NAME 复制到缓存重命名后回传;非图片(GLB 模型等)或大文件走原 URI。
+cleanPickCache();
+for (int i = 0; i < list.size(); i++) list.set(i, localizeImageUri((Uri) list.get(i)));
+if (!list.isEmpty()) uris = (Uri[]) list.toArray(new Uri[list.size()]);
 }
 if (mFileCallback != null) {
 mFileCallback.onReceiveValue(uris);
@@ -106,6 +111,63 @@ mFileCallback = null;
 return;
 }
 super.onActivityResult(requestCode, resultCode, data);
+}
+
+/** 图片类 Uri 复制到 cache 并用真实 DISPLAY_NAME 命名(WebView 对 media ID 型 URI 的 File.name
+    推断为"数字ID+扩展名",真名丢失)。非图片/查询失败/超大文件原样返回。 */
+private Uri localizeImageUri(Uri u) {
+try {
+String mime = getContentResolver().getType(u);
+if (mime == null || !mime.startsWith("image/")) return u;
+String dn = null; long sz = -1;
+android.database.Cursor c = getContentResolver().query(u, null, null, null, null);
+if (c != null) {
+try {
+if (c.moveToFirst()) {
+int iN = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+int iS = c.getColumnIndex(android.provider.OpenableColumns.SIZE);
+if (iN >= 0) dn = c.getString(iN);
+if (iS >= 0 && !c.isNull(iS)) sz = c.getLong(iS);
+}
+} finally { c.close(); }
+}
+if (dn == null || dn.length() == 0 || sz <= 0 || sz > 20L * 1024 * 1024) return u;
+// 防御:去掉路径成分,防缓存目录逃逸
+dn = dn.replace('/', '_').replace('\\', '_');
+if (dn.startsWith(".")) dn = "_" + dn;
+// 无扩展名时按 MIME 补
+if (dn.indexOf(46) < 0) dn = dn + extOf(mime);
+File f = new File(getCacheDir(), "pick_" + System.nanoTime() + "_" + dn);
+java.io.InputStream in = getContentResolver().openInputStream(u);
+java.io.FileOutputStream fo = new java.io.FileOutputStream(f);
+byte[] buf = new byte[65536];
+int r;
+while ((r = in.read(buf)) > 0) fo.write(buf, 0, r);
+fo.close(); in.close();
+return android.net.Uri.fromFile(f);
+} catch (Throwable t) {
+return u;
+}
+}
+
+private String extOf(String mime) {
+if (mime.indexOf("png") >= 0) return ".png";
+if (mime.indexOf("jpeg") >= 0) return ".jpg";
+if (mime.indexOf("webp") >= 0) return ".webp";
+if (mime.indexOf("gif") >= 0) return ".gif";
+if (mime.indexOf("heic") >= 0) return ".heic";
+if (mime.indexOf("bmp") >= 0) return ".bmp";
+return ".img";
+}
+
+/** 启动选择器前清上次 pick_* 缓存副本(防膨胀) */
+private void cleanPickCache() {
+File[] fs = getCacheDir().listFiles();
+if (fs == null) return;
+for (int i = 0; i < fs.length; i++) {
+String n = fs[i].getName();
+if (n.startsWith("pick_")) fs[i].delete();
+}
 }
 @Override
 public void onBackPressed() {
