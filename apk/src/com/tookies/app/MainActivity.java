@@ -132,6 +132,12 @@ if (iS >= 0 && !c.isNull(iS)) sz = c.getLong(iS);
 } finally { c.close(); }
 }
 if (dn == null || dn.length() == 0 || sz <= 0 || sz > 20L * 1024 * 1024) return u;
+// v0.14.14: DISPLAY_NAME 本身是数字名(media ID 型)时——某些 ROM 相册写库 display_name=数字,
+// 文件系统真名(Screenshot_...JPG)在 _data 路径里——查 _data 取 basename 兜底
+if (dn.matches("\\d+\\.(?i)(jpg|jpeg|png|webp|gif|bmp|heic|dng)")) {
+  String real = realNameFromData(u);
+  if (real != null && real.length() > 0) dn = real;
+}
 // 防御:去掉路径成分,防缓存目录逃逸
 dn = dn.replace('/', '_').replace('\\', '_');
 if (dn.startsWith(".")) dn = "_" + dn;
@@ -148,6 +154,23 @@ return android.net.Uri.fromFile(f);
 } catch (Throwable t) {
 return u;
 }
+}
+
+/** 数字名兜底:查 _data 列(绝对路径)取文件系统 basename;失败返回 null */
+private String realNameFromData(Uri u) {
+try {
+android.database.Cursor c = getContentResolver().query(u, new String[]{"_data"}, null, null, null);
+if (c != null) {
+try {
+if (c.moveToFirst() && !c.isNull(0)) {
+String p = c.getString(0);
+int s = p.lastIndexOf('/');
+if (s >= 0 && s < p.length() - 1) return p.substring(s + 1);
+}
+} finally { c.close(); }
+}
+} catch (Throwable ignored) {}
+return null;
 }
 
 private String extOf(String mime) {
