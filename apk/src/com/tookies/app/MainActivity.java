@@ -132,12 +132,22 @@ if (iS >= 0 && !c.isNull(iS)) sz = c.getLong(iS);
 } finally { c.close(); }
 }
 if (dn == null || dn.length() == 0 || sz <= 0 || sz > 20L * 1024 * 1024) return u;
-// v0.14.14: DISPLAY_NAME 本身是数字名(media ID 型)时——某些 ROM 相册写库 display_name=数字,
-// 文件系统真名(Screenshot_...JPG)在 _data 路径里——查 _data 取 basename 兜底
-if (dn.matches("\\d+\\.(?i)(jpg|jpeg|png|webp|gif|bmp|heic|dng)")) {
-  String real = realNameFromData(u);
-  if (real != null && real.length() > 0) dn = real;
-}
+// v0.14.15: 名字解析链——①DocumentsContract.getDocumentName(OPEN_DOCUMENT documents URI,
+// 直通文件系统真名) ②_data basename(media URI 兜底) ③原 DISPLAY_NAME
+try {
+  String dn2 = null;
+  android.database.Cursor c2 = getContentResolver().query(u,
+      new String[]{ android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME }, null, null, null);
+  if (c2 != null) {
+    try { if (c2.moveToFirst()) dn2 = c2.getString(0); } finally { c2.close(); }
+  }
+  if (dn2 != null && dn2.length() > 0 && !dn2.matches("\\d+\\.(?i)(jpg|jpeg|png|webp|gif|bmp|heic|dng)")) {
+    dn = dn2;
+  } else if (dn.matches("\\d+\\.(?i)(jpg|jpeg|png|webp|gif|bmp|heic|dng)")) {
+    String real = realNameFromData(u);
+    if (real != null && real.length() > 0) dn = real;
+  }
+} catch (Throwable ignored) { /* 非 documents URI */ }
 // 防御:去掉路径成分,防缓存目录逃逸
 dn = dn.replace('/', '_').replace('\\', '_');
 if (dn.startsWith(".")) dn = "_" + dn;
@@ -940,7 +950,25 @@ public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams 
 if (activity.mFileCallback != null) { activity.mFileCallback.onReceiveValue(null); }
 activity.mFileCallback = cb;
 try {
-Intent intent = params.createIntent();
+// v0.14.15: GET_CONTENT → ACTION_OPEN_DOCUMENT。GET_CONTENT 走相册 provider,其
+// display_name=数字名(targetSdk 34 下 _data 也拿不到),真名丢失;OPEN_DOCUMENT 回传
+// documents URI,onActivityResult 可 DocumentsContract.getDocumentName 直取文件系统真名。
+// multiple/accept 按 FileChooserParams 保留。
+Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+intent.addCategory(Intent.CATEGORY_OPENABLE);
+intent.setType("*/*");
+String[] accTypes = params.getAcceptTypes();
+java.util.ArrayList<String> mimes = new java.util.ArrayList<String>();
+if (accTypes != null) {
+for (int i = 0; i < accTypes.length; i++) {
+String t = accTypes[i];
+if (t != null && t.length() > 0 && !t.equals("*/*")) mimes.add(t);
+}
+}
+if (!mimes.isEmpty()) {
+intent.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toArray(new String[mimes.size()]));
+}
+intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
 // pose 选择器（accept 含 json）初始定位到保存目录 Download/Tookies，
 // 否则 DocumentsUI 记住的是上次任意浏览位置（如 netease/cloudmusic）。
 // EXTRA_INITIAL_URI 需 API 26+；目录不存在时 DocumentsUI 自动回退默认位置。
