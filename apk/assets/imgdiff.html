@@ -94,6 +94,17 @@
   .ao-actions .primary:disabled { opacity: 0.35; cursor: default; }
   #aoCanvas { flex: 1; min-height: 0; display: block; touch-action: none; background: #262119; }
 
+  /* v0.14.11 竖屏: 行1 八按钮等宽——三组按按钮数 3:2:3 分配 grow,组内按钮 flex 平分,每按钮≈行宽 1/8;
+     仅竖屏(portrait media),横屏按钮样式零改动(锁死) */
+  @media (orientation: portrait) {
+    #barRow1 #rowGroups { display: flex; }
+    #barRow1 #rowGroups .grp { display: flex; min-width: 0; }
+    #barRow1 #grpView { flex: 3 1 0; }
+    #barRow1 #grpAlign { flex: 2 1 0; }
+    #barRow1 #grpFocus { flex: 3 1 0; }
+    #barRow1 #rowGroups .grp button { flex: 1 1 0; min-width: 0; padding: 4px 2px; }
+  }
+
   /* v0.14.3 横屏: 行1=‹图像对比|三组|阈值滑块;行2=A/B 选择行,两个 pick 平分扣 tag+meta 后剩余宽度 */
   @media (orientation: landscape) {
     #bar { gap: 4px; padding: 5px 10px; }
@@ -923,8 +934,8 @@
 
   /* v0.14.9 竖屏顶栏缩字(用户指定),横屏还原全称;仅改文字,dataset/逻辑不动 */
   (function () {
-    var SHORT = { '自动对齐': '自动', '手动对齐': '手动', '图A': 'A', '图B': 'B' };
-    var FULL = { '自动': '自动对齐', '手动': '手动对齐', 'A': '图A', 'B': '图B' };
+    var SHORT = { '自动对齐': '自动', '手动对齐': '手动' }; /* v0.14.11: 图A/图B 空间已够恢复全称 */
+    var FULL = { '自动': '自动对齐', '手动': '手动对齐' };
     var mq = window.matchMedia('(orientation: portrait)');
     function apply(port) {
       var btns = document.querySelectorAll('#grpAlign button, #grpFocus button');
