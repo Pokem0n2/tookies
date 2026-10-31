@@ -32,7 +32,12 @@
     display: flex; flex-direction: column; align-items: stretch; gap: 8px;
     padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--border);
   }
-  #barRow1, #barRow2 { display: flex; flex-direction: column; align-items: stretch; gap: 8px; } /* 竖屏两组各自堆叠(视觉与上游五段直管等价); 常驻 flex 避免 display:contents 在旧 WebView 旋转切换的布局污染 */
+  #barRow1, #barRow2 { display: flex; flex-direction: column; align-items: stretch; gap: 8px; } /* 常驻 flex 避免 display:contents 在旧 WebView 旋转切换的布局污染 */
+  /* v0.14.7 竖屏: 行1=‹图像对比+三组按钮依次同排(窄屏自然折行保序),阈值行独占 */
+  #barRow1 { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  #barRow1 > .brow:first-child { flex: 0 0 auto; }
+  #barRow1 > #rowGroups { flex: 1 1 auto; min-width: 0; }
+  #barRow1 > .th { flex: 1 1 100%; }
   .brow { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; flex-wrap: nowrap; }
   .brow .pick { flex: 1 1 auto; min-width: 0; }
   #rowGroups { gap: 8px; overflow-x: auto; max-width: 100%; scrollbar-width: thin; }
@@ -89,7 +94,7 @@
   /* v0.14.3 横屏: 行1=‹图像对比|三组|阈值滑块;行2=A/B 选择行,两个 pick 平分扣 tag+meta 后剩余宽度 */
   @media (orientation: landscape) {
     #bar { gap: 4px; padding: 5px 10px; }
-    #barRow1 { flex-direction: row; align-items: center; gap: 10px; }
+    #barRow1 { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 10px; }
     #barRow1 #rowGroups { flex-wrap: nowrap; flex: 0 1 auto; min-width: 0; }
     #barRow1 .th { flex: 1 1 0; min-width: 0; }   /* basis 0: 不取内容固有宽,斩断测量反馈链 */
     #barRow2 { flex-direction: row; align-items: center; gap: 8px; }
