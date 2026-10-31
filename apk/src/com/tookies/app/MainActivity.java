@@ -153,13 +153,17 @@ dn = dn.replace('/', '_').replace('\\', '_');
 if (dn.startsWith(".")) dn = "_" + dn;
 // 无扩展名时按 MIME 补
 if (dn.indexOf(46) < 0) dn = dn + extOf(mime);
-File f = new File(getCacheDir(), "pick_" + System.nanoTime() + "_" + dn);
+// v0.14.16: 文件名直接用 dn(无 pick_ 前缀——前缀会暴露在页面 File.name 里);
+// 同名冲突加序号;副本入清单,选择前统一清理
+File f = new File(getCacheDir(), dn);
+for (int k = 2; f.exists(); k++) f = new File(getCacheDir(), dn.replaceFirst("(\\.[^.]+)$", "(" + k + ")$1"));
 java.io.InputStream in = getContentResolver().openInputStream(u);
 java.io.FileOutputStream fo = new java.io.FileOutputStream(f);
 byte[] buf = new byte[65536];
 int r;
 while ((r = in.read(buf)) > 0) fo.write(buf, 0, r);
 fo.close(); in.close();
+mPickCopies.add(f);
 return android.net.Uri.fromFile(f);
 } catch (Throwable t) {
 return u;
@@ -193,13 +197,20 @@ if (mime.indexOf("bmp") >= 0) return ".bmp";
 return ".img";
 }
 
-/** 启动选择器前清上次 pick_* 缓存副本(防膨胀) */
+/** 选择前清上次缓存副本(清单化,v0.14.16 起副本无前缀改用清单追踪) */
+private java.util.ArrayList<File> mPickCopies = new java.util.ArrayList<File>();
 private void cleanPickCache() {
+for (int i = 0; i < mPickCopies.size(); i++) {
+File f = (File) mPickCopies.get(i);
+try { f.delete(); } catch (Throwable ignored) {}
+}
+mPickCopies.clear();
+// 兜底:清历史版本残留的 pick_* 前缀副本
 File[] fs = getCacheDir().listFiles();
 if (fs == null) return;
 for (int i = 0; i < fs.length; i++) {
 String n = fs[i].getName();
-if (n.startsWith("pick_")) fs[i].delete();
+if (n.startsWith("pick_")) { try { fs[i].delete(); } catch (Throwable ignored) {} }
 }
 }
 @Override
@@ -950,25 +961,7 @@ public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams 
 if (activity.mFileCallback != null) { activity.mFileCallback.onReceiveValue(null); }
 activity.mFileCallback = cb;
 try {
-// v0.14.15: GET_CONTENT → ACTION_OPEN_DOCUMENT。GET_CONTENT 走相册 provider,其
-// display_name=数字名(targetSdk 34 下 _data 也拿不到),真名丢失;OPEN_DOCUMENT 回传
-// documents URI,onActivityResult 可 DocumentsContract.getDocumentName 直取文件系统真名。
-// multiple/accept 按 FileChooserParams 保留。
-Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-intent.addCategory(Intent.CATEGORY_OPENABLE);
-intent.setType("*/*");
-String[] accTypes = params.getAcceptTypes();
-java.util.ArrayList<String> mimes = new java.util.ArrayList<String>();
-if (accTypes != null) {
-for (int i = 0; i < accTypes.length; i++) {
-String t = accTypes[i];
-if (t != null && t.length() > 0 && !t.equals("*/*")) mimes.add(t);
-}
-}
-if (!mimes.isEmpty()) {
-intent.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toArray(new String[mimes.size()]));
-}
-intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+Intent intent = params.createIntent(); // v0.14.16: 回退相册协议(OPEN_DOCUMENT 体验差+安全提示横幅,用户裁定)。真名代价见 localizeImageUri 注释
 // pose 选择器（accept 含 json）初始定位到保存目录 Download/Tookies，
 // 否则 DocumentsUI 记住的是上次任意浏览位置（如 netease/cloudmusic）。
 // EXTRA_INITIAL_URI 需 API 26+；目录不存在时 DocumentsUI 自动回退默认位置。

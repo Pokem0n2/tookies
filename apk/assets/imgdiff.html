@@ -116,8 +116,8 @@
     /* v0.14.5: 纯静态 calc 公式替代 flex 平分——旧 WebView 的 flex 动态分配(basis auto
        内容测量链)在多轮布局中反馈膨胀(真机实锤"选择器渐宽/滑杆右漂")。零动态测量即零反馈。 */
     #barRow2 .brow { flex: none; width: calc((100% - 8px) / 2); min-width: 0; }  /* 两行平分(扣行间 gap 8) */
-    #barRow2 .meta { flex: none; width: 64px; overflow: hidden; text-overflow: ellipsis; } /* 尺寸文本定宽 */
-    #barRow2 .pick { flex: none; width: calc(100% - 20px - 64px - 12px); min-width: 0; }  /* 扣 tag20+meta64+两 gap12 */
+    #barRow2 .meta { flex: none; width: 68px; overflow: hidden; text-overflow: ellipsis; } /* 尺寸文本定宽(tabular-nums 实测 65.28px+余量) */
+    #barRow2 .pick { flex: none; width: calc(100% - 20px - 68px - 12px); min-width: 0; }  /* 扣 tag20+meta68+两 gap12 */
     #bar .pick { font-size: 12px; padding: 4px 8px; }
     #empty .card { padding: 22px 30px; }
     #empty .card .big { font-size: 14px; padding: 9px 22px; }
