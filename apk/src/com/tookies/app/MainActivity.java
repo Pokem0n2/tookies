@@ -961,7 +961,25 @@ public boolean onShowFileChooser(WebView v, ValueCallback cb, FileChooserParams 
 if (activity.mFileCallback != null) { activity.mFileCallback.onReceiveValue(null); }
 activity.mFileCallback = cb;
 try {
-Intent intent = params.createIntent(); // v0.14.16: 回退相册协议(OPEN_DOCUMENT 体验差+安全提示横幅,用户裁定)。真名代价见 localizeImageUri 注释
+// v0.14.17: 恢复 OPEN_DOCUMENT(用户裁定重启真名方案,接受文件选择器 UI)。
+// documents URI 的 COLUMN_DISPLAY_NAME 直通文件系统真名;不加 EXTRA_INITIAL_URI
+// 默认定位(用户澄清:截图目录仅测试用,保持 DocumentsUI 默认视图)。
+// json(pose 模块)的 Download/Tookies 初始定位逻辑在下方保留,与此无关。
+Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+intent.addCategory(Intent.CATEGORY_OPENABLE);
+intent.setType("*/*");
+String[] accTypes = params.getAcceptTypes();
+java.util.ArrayList<String> mimes = new java.util.ArrayList<String>();
+if (accTypes != null) {
+for (int i = 0; i < accTypes.length; i++) {
+String t = accTypes[i];
+if (t != null && t.length() > 0 && !t.equals("*/*")) mimes.add(t);
+}
+}
+if (!mimes.isEmpty()) {
+intent.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toArray(new String[mimes.size()]));
+}
+intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
 // pose 选择器（accept 含 json）初始定位到保存目录 Download/Tookies，
 // 否则 DocumentsUI 记住的是上次任意浏览位置（如 netease/cloudmusic）。
 // EXTRA_INITIAL_URI 需 API 26+；目录不存在时 DocumentsUI 自动回退默认位置。
