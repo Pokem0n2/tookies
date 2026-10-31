@@ -32,6 +32,7 @@
     display: flex; flex-direction: column; align-items: stretch; gap: 8px;
     padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--border);
   }
+  #barRow1, #barRow2 { display: contents; } /* 竖屏还原为五段直管 */
   .brow { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; flex-wrap: nowrap; }
   .brow .pick { flex: 1 1 auto; min-width: 0; }
   #rowGroups { gap: 8px; overflow-x: auto; max-width: 100%; scrollbar-width: thin; }
@@ -85,21 +86,16 @@
   .ao-actions .primary:disabled { opacity: 0.35; cursor: default; }
   #aoCanvas { flex: 1; min-height: 0; display: block; touch-action: none; background: #262119; }
 
-  /* v0.14.2 横屏: 顶栏两行 grid——行1 ‹图像对比|重叠/对齐/同步组|阈值滑块,行2 A|B;空态卡片缩小 */
+  /* v0.14.3 横屏: 行1=‹图像对比|三组|阈值滑块;行2=A/B 选择行,两个 pick 平分扣 tag+meta 后剩余宽度 */
   @media (orientation: landscape) {
-    #bar {
-      display: grid;
-      grid-template-columns: max-content max-content 1fr;
-      grid-template-areas: "back groups th" "a a b";
-      align-items: center;
-      gap: 5px 10px;
-      padding: 5px 10px;
-    }
-    #bar > div:nth-child(1) { grid-area: back; }
-    #rowGroups { grid-area: groups; flex-wrap: nowrap; }
-    #bar > label.th { grid-area: th; }
-    #bar > div:nth-child(2) { grid-area: a; }
-    #bar > div:nth-child(5) { grid-area: b; justify-content: flex-end; }
+    #bar { gap: 4px; padding: 5px 10px; }
+    #barRow1 { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+    #barRow1 #rowGroups { flex-wrap: nowrap; }
+    #barRow1 .th { flex: 1 1 auto; min-width: 100px; }
+    #barRow2 { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+    #barRow2 .brow { flex: 1 1 0; min-width: 0; }   /* A/B 行严格对半 */
+    #barRow2 .pick { flex: 1 1 0; min-width: 0; }   /* pick 平分扣 tag+meta 剩余 */
+    #barRow2 .meta { flex: 0 0 auto; }
     #bar .pick { font-size: 12px; padding: 4px 8px; }
     #empty .card { padding: 22px 30px; }
     #empty .card .big { font-size: 14px; padding: 9px 22px; }
@@ -109,34 +105,38 @@
 </head>
 <body>
 <header id="bar">
-  <div class="brow" style="align-items:center;">
-    <button id="tk-back" aria-label="返回" style="flex:0 0 auto;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);font-size:19px;line-height:1;cursor:pointer;padding:0;">‹</button>
-    <span style="font-size:15px;font-weight:600;">图像对比</span>
-  </div>
-  <div class="brow">
-    <span class="tag">A</span>
-    <button class="pick" id="pickA">选择图片</button>
-    <span class="meta" id="metaA"></span>
-  </div>
-  <div class="brow" id="rowGroups">
-    <div class="grp" id="grpView">
-      <button data-v="overlap" class="on">重叠</button><button data-v="hsplit">左右</button><button data-v="vsplit">上下</button>
+  <div id="barRow1">
+    <div class="brow" style="align-items:center;">
+      <button id="tk-back" aria-label="返回" style="flex:0 0 auto;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);font-size:19px;line-height:1;cursor:pointer;padding:0;">‹</button>
+      <span style="font-size:15px;font-weight:600;">图像对比</span>
     </div>
-    <div class="grp" id="grpAlign">
-      <button data-v="auto" class="on">自动对齐</button><button data-v="manual">手动对齐</button>
+    <div class="brow" id="rowGroups">
+      <div class="grp" id="grpView">
+        <button data-v="overlap" class="on">重叠</button><button data-v="hsplit">左右</button><button data-v="vsplit">上下</button>
+      </div>
+      <div class="grp" id="grpAlign">
+        <button data-v="auto" class="on">自动对齐</button><button data-v="manual">手动对齐</button>
+      </div>
+      <div class="grp" id="grpFocus">
+        <button data-v="all" class="on">同步</button><button data-v="A">图A</button><button data-v="B">图B</button>
+      </div>
     </div>
-    <div class="grp" id="grpFocus">
-      <button data-v="all" class="on">同步</button><button data-v="A">图A</button><button data-v="B">图B</button>
-    </div>
+    <label class="th">差异阈值
+      <input type="range" id="thRange" min="0" max="120" value="20">
+      <span class="v" id="thVal">20</span>
+    </label>
   </div>
-  <label class="th">差异阈值
-    <input type="range" id="thRange" min="0" max="120" value="20">
-    <span class="v" id="thVal">20</span>
-  </label>
-  <div class="brow">
-    <span class="tag">B</span>
-    <button class="pick" id="pickB">选择图片</button>
-    <span class="meta" id="metaB"></span>
+  <div id="barRow2">
+    <div class="brow">
+      <span class="tag">A</span>
+      <button class="pick" id="pickA">选择图片</button>
+      <span class="meta" id="metaA"></span>
+    </div>
+    <div class="brow">
+      <span class="tag">B</span>
+      <button class="pick" id="pickB">选择图片</button>
+      <span class="meta" id="metaB"></span>
+    </div>
   </div>
 </header>
 <main id="stage"></main>
