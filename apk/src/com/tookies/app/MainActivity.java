@@ -87,8 +87,17 @@ if (webView != null) webView.evaluateJavascript("window.__resume && window.__res
 protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 if (requestCode == FILE_REQ) {
 Uri[] uris = null;
-if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+if (resultCode == RESULT_OK && data != null) {
+// v0.14.1: 多选(相册勾选多张)返回 ClipData,getData() 为 null 被当"取消"→页面收不到图。
+// 解析顺序: ClipData 遍历(多选) → getData()(单选,GLB 添加模型路径行为不变)
+if (data.getClipData() != null) {
+android.content.ClipData cd = data.getClipData();
+int n = cd.getItemCount();
+uris = new Uri[n];
+for (int i = 0; i < n; i++) uris[i] = cd.getItemAt(i).getUri();
+} else if (data.getData() != null) {
 uris = new Uri[]{ data.getData() };
+}
 }
 if (mFileCallback != null) {
 mFileCallback.onReceiveValue(uris);
