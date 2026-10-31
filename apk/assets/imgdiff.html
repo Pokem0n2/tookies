@@ -22,12 +22,12 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
     background: var(--bg); color: var(--text);
-    display: grid; grid-template-rows: auto 1fr;
+    display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr);
     height: 100dvh; overflow: hidden;
     font-size: 14px;
     -webkit-tap-highlight-color: transparent;
   }
-  #bar { grid-row: 1; grid-column: 1; }
+  #bar { grid-row: 1; grid-column: 1; min-width: 0; }
   #bar {
     display: flex; flex-direction: column; align-items: stretch; gap: 8px;
     padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--border);
@@ -58,7 +58,7 @@
   .grp button.on { background: var(--accent); color: #fff; }
   .grp button:disabled { opacity: 0.35; cursor: default; }
   .th { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; }
-  .th input[type="range"] { flex: 1 1 auto; min-width: 0; width: auto; accent-color: var(--accent); }
+  .th input[type="range"] { flex: 1 1 0; min-width: 0; width: auto; accent-color: var(--accent); } /* v0.14.6: basis auto→0,斩断 range 固有宽反馈(真机 bar 撑宽 545px 根因) */
   .th .v { flex: 0 0 auto; min-width: 2.2em; text-align: right; color: var(--text); }
   #stage { grid-row: 2; grid-column: 1; min-height: 0; display: flex; }
   #stage.hsplit { flex-direction: row; }
@@ -90,7 +90,7 @@
   @media (orientation: landscape) {
     #bar { gap: 4px; padding: 5px 10px; }
     #barRow1 { flex-direction: row; align-items: center; gap: 10px; }
-    #barRow1 #rowGroups { flex-wrap: nowrap; }
+    #barRow1 #rowGroups { flex-wrap: nowrap; flex: 0 1 auto; min-width: 0; }
     #barRow1 .th { flex: 1 1 0; min-width: 0; }   /* basis 0: 不取内容固有宽,斩断测量反馈链 */
     #barRow2 { flex-direction: row; align-items: center; gap: 8px; }
     /* v0.14.5: 纯静态 calc 公式替代 flex 平分——旧 WebView 的 flex 动态分配(basis auto
