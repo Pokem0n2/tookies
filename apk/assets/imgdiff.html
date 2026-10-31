@@ -927,10 +927,14 @@
 
   /* ---------- 布局监听 ---------- */
   if (window.ResizeObserver) {
-    new ResizeObserver(function () { requestRender(); }).observe(els.stage);
-    new ResizeObserver(function () { requestRender(); }).observe(els.aoCanvas);
+    new ResizeObserver(function () { onViewportChange(); }).observe(els.stage);
+    new ResizeObserver(function () { onViewportChange(); }).observe(els.aoCanvas);
   }
-  window.addEventListener('resize', requestRender);
+  /* v0.14.12: 旋转/resize 清视图变换缓存——S.tf 按旧画布尺寸缓存,旋转后画布变而缓存不失效
+     导致图像偏移(真机实锤+无头复现 margins L12 R465)。resetViews 后 matTf 惰性按新尺寸重算 fit+居中;
+     手动对齐层 ao.tf 同步重置(锚点保留,仅视图变换重算) */
+  function onViewportChange() { resetViews(); ao.tf = { A: null, B: null }; requestRender(); }
+  window.addEventListener('resize', onViewportChange);
 
   /* v0.14.9 竖屏顶栏缩字(用户指定),横屏还原全称;仅改文字,dataset/逻辑不动 */
   (function () {
