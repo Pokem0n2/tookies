@@ -43,6 +43,10 @@
   #barRow1 > .th { grid-area: th; }
   .brow { display: flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; flex-wrap: nowrap; }
   .brow .pick { flex: 1 1 auto; min-width: 0; }
+  /* v0.14.19 全局: meta 定宽 68+居左——竖屏两行 meta 起点垂直对齐(此前仅横屏定宽,
+     竖屏自然宽致 1437×848(8字符) 比 2400×1350(9字符) 左缘右移 6.6px);
+     pick flex:1 1 auto 吃剩余→两行同宽。横屏 media 内同值规则不变 */
+  .brow .meta { flex: none; width: 68px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
   #rowGroups { gap: 8px; overflow-x: auto; max-width: 100%; scrollbar-width: thin; }
   .tag {
     flex: none; width: 20px; height: 20px; border-radius: 5px;
@@ -51,13 +55,13 @@
     font-weight: 700; font-size: 12px;
   }
   .pick {
-    font-family: ui-monospace, Roboto Mono, Droid Sans Mono, monospace; font-size: 11px; /* v0.14.18: 全字符等宽且更窄——tabular-nums 仅数字等宽(6.67)而字母比例(6.13~7.66)/连字符(4.17)混排拉扯感;mono 11px 统一 6.63px */
+    font-family: ui-monospace, Roboto Mono, Droid Sans Mono, monospace; font-size: 11px; letter-spacing: -0.4px; /* v0.14.18 等宽;v0.14.19 收紧字符间隙(mono side bearing~1.3px,负 spacing 不碰墨迹) */
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
     border-radius: 7px; padding: 5px 10px; cursor: pointer; /* v0.14.18: 字号定于本块首行 mono 11px */
   }
   .pick:hover { border-color: var(--accent); }
-  .meta { color: var(--muted); white-space: nowrap; font-family: ui-monospace, Roboto Mono, Droid Sans Mono, monospace; font-size: 11px; } /* v0.14.18: mono 等宽,与 pick 一致 */
+  .meta { color: var(--muted); white-space: nowrap; font-family: ui-monospace, Roboto Mono, Droid Sans Mono, monospace; font-size: 11px; letter-spacing: -0.4px; } /* v0.14.18 等宽;v0.14.19 收紧 */
   .grp { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
   .grp button {
     border: none; border-right: 1px solid var(--border); background: transparent;
