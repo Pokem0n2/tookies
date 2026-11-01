@@ -51,13 +51,13 @@
     font-weight: 700; font-size: 12px;
   }
   .pick {
-    font-variant-numeric: tabular-nums; /* v0.14.14: 数字等宽(11 与 38 同宽) */
+    font-family: ui-monospace, Roboto Mono, Droid Sans Mono, monospace; font-size: 11px; /* v0.14.18: 全字符等宽且更窄——tabular-nums 仅数字等宽(6.67)而字母比例(6.13~7.66)/连字符(4.17)混排拉扯感;mono 11px 统一 6.63px */
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     border: 1px solid var(--border); background: var(--panel); color: var(--text);
-    border-radius: 7px; padding: 5px 10px; font-size: 13px; cursor: pointer;
+    border-radius: 7px; padding: 5px 10px; cursor: pointer; /* v0.14.18: 字号定于本块首行 mono 11px */
   }
   .pick:hover { border-color: var(--accent); }
-  .meta { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .meta { color: var(--muted); white-space: nowrap; font-family: ui-monospace, Roboto Mono, Droid Sans Mono, monospace; font-size: 11px; } /* v0.14.18: mono 等宽,与 pick 一致 */
   .grp { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); }
   .grp button {
     border: none; border-right: 1px solid var(--border); background: transparent;
@@ -118,7 +118,7 @@
     #barRow2 .brow { flex: none; width: calc((100% - 8px) / 2); min-width: 0; }  /* 两行平分(扣行间 gap 8) */
     #barRow2 .meta { flex: none; width: 68px; overflow: hidden; text-overflow: ellipsis; } /* 尺寸文本定宽(tabular-nums 实测 65.28px+余量) */
     #barRow2 .pick { flex: none; width: calc(100% - 20px - 68px - 12px); min-width: 0; }  /* 扣 tag20+meta68+两 gap12 */
-    #bar .pick { font-size: 12px; padding: 4px 8px; }
+    #bar .pick { padding: 4px 8px; } /* v0.14.18: 字号随 .pick 的 mono 11px */
     #empty .card { padding: 22px 30px; }
     #empty .card .big { font-size: 14px; padding: 9px 22px; }
     #empty .card .hint { margin-top: 9px; font-size: 12px; }
