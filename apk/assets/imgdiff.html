@@ -868,10 +868,35 @@
   els.grpFocus.addEventListener('click', function (e) {
     var btn = e.target.closest('button');
     if (!btn || btn.disabled) return;
+    if (btn.dataset.v === 'A' || btn.dataset.v === 'B') {
+      rotateImg(btn.dataset.v); /* v0.14.20: 图A/图B=每点一次顺时针旋转该图90° */
+      return;
+    }
     S.focus = btn.dataset.v;
     updateBar();
     requestRender();
   });
+  /* v0.14.20: 顺时针旋转 90°——离屏 canvas 烘焙旋转位图替换 S.imgs[slot](w/h 互换,name 保留),
+     下游 diff/对齐/meta 全透明;锚点清空(旧坐标失效);视图重置;双图时立即刷新自动对齐 */
+  function rotateImg(slot) {
+    var it = S.imgs[slot];
+    if (!it) return;
+    var src = it.bitmap, w = it.w, h = it.h;
+    var c = document.createElement('canvas');
+    c.width = h; c.height = w;
+    var cx = c.getContext('2d');
+    cx.translate(c.width / 2, c.height / 2);
+    cx.rotate(Math.PI / 2);
+    cx.drawImage(src, -w / 2, -h / 2);
+    S.imgs[slot] = { bitmap: c, w: h, h: w, name: it.name };
+    S.anchors[slot] = [];
+    resetViews();
+    ao.tf = { A: null, B: null };
+    if (bothLoaded()) { S.align = 'auto'; setupAlignment(); }
+    else { setupAlignment(); }
+    updateBar();
+    requestRender();
+  }
   els.grpView.addEventListener('click', function (e) {
     var btn = e.target.closest('button');
     if (!btn || btn.disabled) return;
